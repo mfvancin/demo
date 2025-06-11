@@ -1,19 +1,23 @@
 {
   "expo": {
-    "name": "irhis",
-    "slug": "irhis",
+    "name": "demoirhisn",
+    "slug": "demoirhisn",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./app/assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./app/assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.irhis"
+      "bundleIdentifier": "com.eucdemo.irhis",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +29,11 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "main": "index.js"
+    "main": "index.js",
+    "extra": {
+      "eas": {
+        "projectId": "bb7686e9-dae9-483f-8b4c-3f43325bd06c"
+      }
+    }
   }
-} 
+}

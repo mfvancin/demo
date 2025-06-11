@@ -9,7 +9,6 @@ import ChartCard from '@components/ChartCard';
 
 const PatientHomeScreen = ({ navigation }: any) => {
     const { colors } = useTheme();
-    // In a real app, you'd have a logged-in user ID. We'll hardcode '1' for now.
     const patient = mockPatients['1'];
     const recoveryPlan = {
         total: patient.recovery_process.length,

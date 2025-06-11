@@ -11,8 +11,6 @@ const LogbookScreen = ({ navigation }: any) => {
     const [strength, setStrength] = useState(5);
 
     const handleSave = () => {
-        // In a real app, this would save to a database.
-        // We'll just show an alert and navigate back.
         Alert.alert(
             "Log Saved",
             `Pain: ${pain}\nDiscomfort: ${discomfort}\nTiredness: ${tiredness}\nStrength: ${strength}`,
@@ -83,7 +81,7 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 12,
         alignItems: 'center',
-        marginTop: 'auto', // Push to bottom
+        marginTop: 'auto', 
         marginBottom: 20,
     },
     buttonText: {

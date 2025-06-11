@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, Swit
 import { User } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 
-// Mock user data, in a real app this would come from an auth context
 const mockUser: User = {
   id: '1',
   name: 'John Doe',
@@ -18,7 +17,6 @@ const ProfileScreen = () => {
   const [name, setName] = useState(user.name);
 
   const handleSave = () => {
-    // In a real app, you would send this to the backend
     setUser({ ...user, name });
     setIsEditing(false);
   };

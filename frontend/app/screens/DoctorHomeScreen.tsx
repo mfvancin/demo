@@ -7,7 +7,6 @@ import { mockPatients } from '@data/mockPatients';
 
 const DoctorHomeScreen = ({ navigation }: any) => {
     const { colors } = useTheme();
-    // Convert the mockPatients object to an array for the FlatList
     const patients = Object.values(mockPatients);
 
     const renderPatient = ({ item }: { item: Patient }) => (

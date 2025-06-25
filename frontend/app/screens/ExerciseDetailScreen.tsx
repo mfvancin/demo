@@ -34,7 +34,7 @@ const ExerciseDetailScreen = ({ route, navigation }: any) => {
                     <Text style={[styles.buttonText, { color: colors.white }]}>Mark as Complete</Text>
                 </TouchableOpacity>
 
-                 <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
+                <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
                     <Text style={[styles.closeButtonText, { color: colors.primary }]}>Close</Text>
                 </TouchableOpacity>
             </View>

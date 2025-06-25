@@ -27,7 +27,7 @@ const PatientHomeScreen = ({ navigation }: any) => {
                 <ChartCard 
                     title="Steps"
                     value={stepsData.value.toLocaleString()}
-                    icon={<Ionicons name="footsteps" size={20} color={colors.primary} />}
+                    icon={<Ionicons name="walk-outline" size={20} color={colors.primary} />}
                     chartData={stepsData.chartData}
                 />
 

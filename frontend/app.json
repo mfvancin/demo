@@ -4,13 +4,16 @@
     "slug": "demoirhisn",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./app/assets/icon.png",
+    "icon": "./assets/eucip.png",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./app/assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.eucdemo.irhis",
@@ -19,17 +22,6 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "package": "com.anonymous.irhis"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "main": "index.js",
     "extra": {
       "eas": {
         "projectId": "bb7686e9-dae9-483f-8b4c-3f43325bd06c"

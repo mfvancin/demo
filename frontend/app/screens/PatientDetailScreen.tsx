@@ -26,7 +26,9 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
     }, [patientData]);
 
     const handleToggleComplete = (id: string, type: 'exercise' | 'medication') => {
-        if (role !== 'patient') return; // Only patients can toggle completion
+        if (role !== 'patient') {
+            return;
+        } 
 
         if (type === 'exercise') {
             setExercises(current =>

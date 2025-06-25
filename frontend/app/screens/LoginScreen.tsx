@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import SegmentedControl from '../components/SegmentedControl';
 
@@ -50,6 +50,7 @@ const LoginScreen = ({ navigation }: any) => {
           <Text style={[styles.linkText, { color: colors.primary }]}>Don't have an account? Sign Up</Text>
         </TouchableOpacity>
       </View>
+      <Image source={require('../../assets/eu.png')} style={styles.footerImage} />
     </SafeAreaView>
   );
 };
@@ -91,6 +92,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     fontSize: 16,
+  },
+  footerImage: {
+    width: '100%',
+    height: 50,
+    resizeMode: 'contain',
+    alignSelf: 'center',
+    marginBottom: 20,
   },
 });
 

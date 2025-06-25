@@ -116,7 +116,7 @@ const AppNavigator = () => {
                             }
                         }} 
                     />
-                     <Stack.Screen 
+                    <Stack.Screen 
                         name="Logbook" 
                         component={LogbookScreen} 
                         options={{ 

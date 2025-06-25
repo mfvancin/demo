@@ -13,23 +13,20 @@ install! 'cocoapods',
 
 prepare_react_native_project!
 
+flipper_config = FlipperConfiguration.disabled
+if ENV['NO_FLIPPER'] == '1' then
+  flipper_config = FlipperConfiguration.disabled
+elsif podfile_properties.key?('ios.flipper') then
+  if podfile_properties['ios.flipper'] == 'true' then
+    flipper_config = FlipperConfiguration.enabled(["Debug", "Release"])
+  elsif podfile_properties['ios.flipper'] != 'false' then
+    flipper_config = FlipperConfiguration.enabled(["Debug", "Release"], { 'Flipper' => podfile_properties['ios.flipper'] })
+  end
+end
+
 target 'demoirhisn' do
   use_expo_modules!
-
-  if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
-    config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
-  else
-    config_command = [
-      'npx',
-      'expo-modules-autolinking',
-      'react-native-config',
-      '--json',
-      '--platform',
-      'ios'
-    ]
-  end
-
-  config = use_native_modules!(config_command)
+  config = use_native_modules!
 
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
   use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
@@ -37,9 +34,7 @@ target 'demoirhisn' do
   use_react_native!(
     :path => config[:reactNativePath],
     :hermes_enabled => podfile_properties['expo.jsEngine'] == nil || podfile_properties['expo.jsEngine'] == 'hermes',
-    # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/..",
-    :privacy_file_aggregation_enabled => podfile_properties['apple.privacyManifestAggregationEnabled'] != 'false',
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
   post_install do |installer|
@@ -47,11 +42,9 @@ target 'demoirhisn' do
       installer,
       config[:reactNativePath],
       :mac_catalyst_enabled => false,
-      :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
+      :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true'
     )
 
-    # This is necessary for Xcode 14, because it signs resource bundles by default
-    # when building for devices.
     installer.target_installation_results.pod_target_installation_results
       .each do |pod_name, target_installation_result|
       target_installation_result.resource_bundle_targets.each do |resource_bundle_target|
@@ -59,6 +52,14 @@ target 'demoirhisn' do
           config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
         end
       end
+    end
+  end
+
+  post_integrate do |installer|
+    begin
+      expo_patch_react_imports!(installer)
+    rescue => e
+      Pod::UI.warn e
     end
   end
 end

@@ -10,7 +10,8 @@
       "@navigation/*": ["app/navigation/*"],
       "@screens/*": ["app/screens/*"],
       "@theme/*": ["app/theme/*"],
-      "@types/*": ["app/types/*"]
+      "@types/*": ["app/types/*"],
+      "@services/*": ["app/services/*"]
     },
     "esModuleInterop": true
   }

@@ -5,11 +5,14 @@ import { useTheme } from '../theme/ThemeContext';
 
 const ExerciseDetailScreen = ({ route, navigation }: any) => {
     const { colors } = useTheme();
-    const { exercise, onComplete } = route.params;
+    const { exercise } = route.params;
 
     const handleComplete = () => {
-        onComplete(exercise.id);
-        navigation.goBack();
+        navigation.navigate({
+            name: 'PatientDetail',
+            params: { completedExerciseId: exercise.id },
+            merge: true,
+        });
     };
 
     return (

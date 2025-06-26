@@ -45,7 +45,7 @@ const PatientHomeScreen = ({ navigation }: any) => {
                     <View style={styles.cardDetail}>
                         <Text style={[styles.cardDetailText, { color: colors.textSecondary }]}>{`${recoveryPlan.completed} of ${recoveryPlan.total} completed`}</Text>
                         <Ionicons name="chevron-forward" size={22} color={colors.darkGray} />
-                    </View>
+        </View>
                 </TouchableOpacity>
 
             </ScrollView>

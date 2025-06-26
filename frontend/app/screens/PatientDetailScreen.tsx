@@ -10,7 +10,7 @@ import AssignmentModal from '@components/AssignmentModal';
 
 const PatientDetailScreen = ({ route, navigation }: any) => {
     const { colors } = useTheme();
-    const { patientId, role } = route.params;
+    const { patientId, role, completedExerciseId } = route.params;
     const patientData = mockPatients[patientId];
 
     const [exercises, setExercises] = useState<RecoveryProcess[]>([]);
@@ -24,6 +24,13 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
             setMedications(patientData.medications || []);
         }
     }, [patientData]);
+
+    useEffect(() => {
+        if (completedExerciseId) {
+            handleToggleComplete(completedExerciseId, 'exercise');
+            navigation.setParams({ completedExerciseId: null });
+        }
+    }, [completedExerciseId]);
 
     const handleToggleComplete = (id: string, type: 'exercise' | 'medication') => {
         if (role !== 'patient') {
@@ -95,7 +102,6 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
                 if (role === 'patient') {
                     navigation.navigate('ExerciseDetail', { 
                         exercise: item,
-                        onComplete: (id: string) => handleToggleComplete(id, 'exercise')
                     });
                 }
             }}

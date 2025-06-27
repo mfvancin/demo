@@ -14,6 +14,7 @@ import PatientDetailScreen from '@screens/PatientDetailScreen';
 import ProfileScreen from '@screens/ProfileScreen';
 import LogbookScreen from '@screens/LogbookScreen';
 import ExerciseDetailScreen from '@screens/ExerciseDetailScreen';
+import MovellaScreen from '@screens/MovellaScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -71,6 +72,13 @@ const DoctorTabNavigator = () => {
         component={DoctorHomeScreen} 
         options={{
             tabBarIcon: ({ color, size }) => <Ionicons name="list-outline" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen 
+        name="Analysis" 
+        component={MovellaScreen} 
+        options={{
+            tabBarIcon: ({ color, size }) => <Ionicons name="analytics-outline" size={size} color={color} />,
         }}
       />
       <Tab.Screen 

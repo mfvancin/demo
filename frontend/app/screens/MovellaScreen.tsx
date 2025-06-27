@@ -8,8 +8,7 @@ import { useTheme } from '@theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { calculateJointAngles, getRelativeQuaternion, SensorDataRow } from '../utils/sensorCalculations';
-import Avatar from '../components/Avatar';
-import type { BodyOrientations } from '../components/Avatar';
+import Avatar, { BodyOrientations } from '../components/Avatar';
 import Slider from '@react-native-community/slider';
 import * as THREE from 'three';
 
@@ -21,8 +20,11 @@ const MovellaScreen = () => {
     const [sensorData, setSensorData] = useState<Record<string, SensorDataRow[]>>({});
     const [jointAngles, setJointAngles] = useState<number[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [maxFrames, setMaxFrames] = useState(0);
     const [currentFrame, setCurrentFrame] = useState(0);
     const [bodyOrientations, setBodyOrientations] = useState<BodyOrientations>({});
+    const [horizontalRotation, setHorizontalRotation] = useState(0);
+    const [verticalRotation, setVerticalRotation] = useState(0);
 
     useEffect(() => {
         if (!sensorData || Object.keys(sensorData).length === 0) {
@@ -79,6 +81,8 @@ const MovellaScreen = () => {
         setJointAngles([]);
         setCurrentFrame(0);
         setBodyOrientations({});
+        setHorizontalRotation(0);
+        setVerticalRotation(0);
 
         try {
             const result = await DocumentPicker.getDocumentAsync({
@@ -199,21 +203,49 @@ const MovellaScreen = () => {
             <>
                 <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 10 }]}>Digital Twin</Text>
                 <View style={[styles.card, { backgroundColor: colors.card }]}>
-                    <Avatar orientations={bodyOrientations} />
-                        {maxFrames > 0 && (
-                            <Slider
-                                style={styles.slider}
-                                minimumValue={0}
-                                maximumValue={maxFrames}
-                                step={1}
-                                value={currentFrame}
-                                onValueChange={setCurrentFrame}
-                                minimumTrackTintColor={colors.primary}
-                                maximumTrackTintColor={colors.mediumGray}
-                                thumbTintColor={colors.primary}
-                            />
-                        )}
+                    <Avatar 
+                        orientations={bodyOrientations}
+                        horizontalRotation={horizontalRotation}
+                        verticalRotation={verticalRotation}
+                    />
+                    {maxFrames > 0 && (
+                        <Slider
+                            style={styles.slider}
+                            minimumValue={0}
+                            maximumValue={maxFrames}
+                            step={1}
+                            value={currentFrame}
+                            onValueChange={(value) => setCurrentFrame(Math.floor(value))}
+                            minimumTrackTintColor={colors.primary}
+                            maximumTrackTintColor={colors.mediumGray}
+                            thumbTintColor={colors.primary}
+                        />
+                    )}
                     <Text style={styles.frameText}>Frame: {currentFrame}</Text>
+                    
+                    <Slider
+                        style={styles.slider}
+                        minimumValue={-180}
+                        maximumValue={180}
+                        value={horizontalRotation}
+                        onValueChange={setHorizontalRotation}
+                        minimumTrackTintColor={colors.primary}
+                        maximumTrackTintColor={colors.mediumGray}
+                        thumbTintColor={colors.primary}
+                    />
+                    <Text style={styles.frameText}>Horizontal: {horizontalRotation.toFixed(0)}°</Text>
+                    
+                    <Slider
+                        style={styles.slider}
+                        minimumValue={-90}
+                        maximumValue={90}
+                        value={verticalRotation}
+                        onValueChange={setVerticalRotation}
+                        minimumTrackTintColor={colors.primary}
+                        maximumTrackTintColor={colors.mediumGray}
+                        thumbTintColor={colors.primary}
+                    />
+                    <Text style={styles.frameText}>Vertical: {verticalRotation.toFixed(0)}°</Text>
                 </View>
             </>
         )
@@ -314,6 +346,29 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: '#8E8E93',
         marginTop: 5,
+    },
+    button: {
+        marginBottom: 10,
+    },
+    chartContainer: {
+        marginTop: 20,
+    },
+    sliderContainer: {
+        marginTop: 15,
+        alignItems: 'center',
+    },
+    sliderLabel: {
+        fontSize: 16,
+        color: '#666',
+    },
+    sliderValue: {
+        marginTop: 5,
+        fontSize: 14,
+        color: '#333',
+    },
+    dataRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
     }
 });
 

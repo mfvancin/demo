@@ -17,62 +17,42 @@ export interface BodyOrientations {
 
 interface AvatarProps {
     orientations?: BodyOrientations;
+    horizontalRotation?: number;
+    verticalRotation?: number;
 }
 
-const Avatar: React.FC<AvatarProps> = ({ orientations }) => {
+const Avatar: React.FC<AvatarProps> = ({ orientations, horizontalRotation = 0, verticalRotation = 0 }) => {
     const glRef = useRef<any>(null);
     const rendererRef = useRef<Renderer | null>(null);
     const sceneRef = useRef<THREE.Scene | null>(null);
     const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-    const headRef = useRef<THREE.Mesh | null>(null);
-    const torsoRef = useRef<THREE.Mesh | null>(null);
-    const leftUpperArmRef = useRef<THREE.Mesh | null>(null);
-    const leftForearmRef = useRef<THREE.Mesh | null>(null);
-    const rightUpperArmRef = useRef<THREE.Mesh | null>(null);
-    const rightForearmRef = useRef<THREE.Mesh | null>(null);
-    const pelvisRef = useRef<THREE.Mesh | null>(null);
-    const rightThighRef = useRef<THREE.Mesh | null>(null);
-    const rightShinRef = useRef<THREE.Mesh | null>(null);
-    const leftThighRef = useRef<THREE.Mesh | null>(null);
-    const leftShinRef = useRef<THREE.Mesh | null>(null);
-    let timeoutId: number;
+    const avatarGroup = useRef<THREE.Group>(new THREE.Group());
+    const bodyPartRefs = useRef<{ [key: string]: THREE.Mesh | null }>({});
+    let animationFrameId: number;
 
     useEffect(() => {
         return () => {
-            if (timeoutId) {
-                cancelAnimationFrame(timeoutId);
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
             }
         };
     }, []);
     
     useEffect(() => {
         if (orientations) {
-            if (torsoRef.current && orientations.torso) {
-                torsoRef.current.quaternion.copy(orientations.torso);
-            }
-            if (leftUpperArmRef.current && orientations.upperArm) {
-                leftUpperArmRef.current.quaternion.copy(orientations.upperArm);
-            }
-            if (leftForearmRef.current && orientations.forearm) {
-                leftForearmRef.current.quaternion.copy(orientations.forearm);
-            }
-            if (pelvisRef.current && orientations.pelvis) {
-                pelvisRef.current.quaternion.copy(orientations.pelvis);
-            }
-            if (rightThighRef.current && orientations.rightThigh) {
-                rightThighRef.current.quaternion.copy(orientations.rightThigh);
-            }
-            if (rightShinRef.current && orientations.rightShin) {
-                rightShinRef.current.quaternion.copy(orientations.rightShin);
-            }
-            if (leftThighRef.current && orientations.leftThigh) {
-                leftThighRef.current.quaternion.copy(orientations.leftThigh);
-            }
-            if (leftShinRef.current && orientations.leftShin) {
-                leftShinRef.current.quaternion.copy(orientations.leftShin);
+            for (const [part, orientation] of Object.entries(orientations)) {
+                const bodyPart = bodyPartRefs.current[part];
+                if (bodyPart && orientation) {
+                    bodyPart.quaternion.copy(orientation);
+                }
             }
         }
     }, [orientations]);
+
+    useEffect(() => {
+        avatarGroup.current.rotation.y = THREE.MathUtils.degToRad(horizontalRotation);
+        avatarGroup.current.rotation.x = THREE.MathUtils.degToRad(verticalRotation);
+    }, [horizontalRotation, verticalRotation]);
 
     const onContextCreate = async (gl: any) => {
         glRef.current = gl;
@@ -89,6 +69,8 @@ const Avatar: React.FC<AvatarProps> = ({ orientations }) => {
         camera.position.y = 1;
         cameraRef.current = camera;
         
+        scene.add(avatarGroup.current);
+
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
@@ -101,69 +83,72 @@ const Avatar: React.FC<AvatarProps> = ({ orientations }) => {
         const limbMaterial = new THREE.MeshPhongMaterial({ color: 0x2dbe75 });
         const pelvisMaterial = new THREE.MeshPhongMaterial({ color: 0x752dbe });
 
-        // Body Hierarchy
-        const pelvis = new THREE.Mesh(new THREE.BoxGeometry(1, 0.4, 0.6), pelvisMaterial);
-        scene.add(pelvis);
-        pelvisRef.current = pelvis;
-
-        const torso = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 0.5), torsoMaterial);
-        torso.position.y = 0.95;
-        pelvis.add(torso);
-        torsoRef.current = torso;
-        
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), headMaterial);
-        head.position.y = 1.05;
-        torso.add(head);
-        headRef.current = head;
-        
+        // Geometries
+        const headGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+        const torsoGeometry = new THREE.BoxGeometry(1, 1.5, 0.5);
+        const pelvisGeometry = new THREE.BoxGeometry(1, 0.4, 0.6);
         const armGeometry = new THREE.BoxGeometry(0.25, 0.8, 0.25);
         const forearmGeometry = new THREE.BoxGeometry(0.22, 0.7, 0.22);
         const thighGeometry = new THREE.BoxGeometry(0.35, 1, 0.35);
         const shinGeometry = new THREE.BoxGeometry(0.3, 0.9, 0.3);
 
+        // Body Parts
+        const pelvis = new THREE.Mesh(pelvisGeometry, pelvisMaterial);
+        avatarGroup.current.add(pelvis);
+        bodyPartRefs.current['pelvis'] = pelvis;
+
+        const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
+        torso.position.y = 0.95;
+        pelvis.add(torso);
+        bodyPartRefs.current['torso'] = torso;
+        
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = 1.05;
+        torso.add(head);
+        bodyPartRefs.current['head'] = head;
+        
         // Left Arm
         const leftUpperArm = new THREE.Mesh(armGeometry, limbMaterial);
         leftUpperArm.position.set(-0.625, 0.35, 0);
         torso.add(leftUpperArm);
-        leftUpperArmRef.current = leftUpperArm;
+        bodyPartRefs.current['leftUpperArm'] = leftUpperArm;
         const leftForearm = new THREE.Mesh(forearmGeometry, limbMaterial);
         leftForearm.position.y = -0.75;
         leftUpperArm.add(leftForearm);
-        leftForearmRef.current = leftForearm;
+        bodyPartRefs.current['leftForearm'] = leftForearm;
         
         // Right Arm
         const rightUpperArm = new THREE.Mesh(armGeometry, limbMaterial);
         rightUpperArm.position.set(0.625, 0.35, 0);
         torso.add(rightUpperArm);
-        rightUpperArmRef.current = rightUpperArm;
+        bodyPartRefs.current['rightUpperArm'] = rightUpperArm;
         const rightForearm = new THREE.Mesh(forearmGeometry, limbMaterial);
         rightForearm.position.y = -0.75;
         rightUpperArm.add(rightForearm);
-        rightForearmRef.current = rightForearm;
+        bodyPartRefs.current['rightForearm'] = rightForearm;
 
         // Left Leg
         const leftThigh = new THREE.Mesh(thighGeometry, limbMaterial);
         leftThigh.position.set(-0.3, -0.7, 0);
         pelvis.add(leftThigh);
-        leftThighRef.current = leftThigh;
+        bodyPartRefs.current['leftThigh'] = leftThigh;
         const leftShin = new THREE.Mesh(shinGeometry, limbMaterial);
         leftShin.position.y = -0.95;
         leftThigh.add(leftShin);
-        leftShinRef.current = leftShin;
+        bodyPartRefs.current['leftShin'] = leftShin;
         
         // Right Leg
         const rightThigh = new THREE.Mesh(thighGeometry, limbMaterial);
         rightThigh.position.set(0.3, -0.7, 0);
         pelvis.add(rightThigh);
-        rightThighRef.current = rightThigh;
+        bodyPartRefs.current['rightThigh'] = rightThigh;
         const rightShin = new THREE.Mesh(shinGeometry, limbMaterial);
         rightShin.position.y = -0.95;
         rightThigh.add(rightShin);
-        rightShinRef.current = rightShin;
-
+        bodyPartRefs.current['rightShin'] = rightShin;
 
         const animate = () => {
-            timeoutId = requestAnimationFrame(animate);
+            animationFrameId = requestAnimationFrame(animate);
             if (rendererRef.current && sceneRef.current && cameraRef.current) {
                 rendererRef.current.render(sceneRef.current, cameraRef.current);
             }

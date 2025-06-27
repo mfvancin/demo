@@ -12,38 +12,38 @@ const SignupScreen = ({ navigation }: any) => {
 
   const handleSignup = () => {
     if (role === 'Doctor') {
-      navigation.navigate('DoctorHome');
-    } else {
-      navigation.navigate('PatientHome');
+        navigation.navigate('DoctorHome');
+      } else {
+        navigation.navigate('PatientHome');
     }
   };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <View style={styles.container}>
+    <View style={styles.container}>
         <Text style={[styles.title, { color: colors.text }]}>Create Account</Text>
-        <TextInput
+      <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.mediumGray }]}
           placeholder="Full Name"
-          value={name}
-          onChangeText={setName}
+        value={name}
+        onChangeText={setName}
           placeholderTextColor={colors.textSecondary}
-        />
-        <TextInput
+      />
+      <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.mediumGray }]}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
           keyboardType="email-address"
           placeholderTextColor={colors.textSecondary}
-        />
-        <TextInput
+      />
+      <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.mediumGray }]}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
           placeholderTextColor={colors.textSecondary}
         />
         <SegmentedControl

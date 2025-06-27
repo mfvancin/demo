@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert, Dimensions } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
@@ -7,8 +7,11 @@ import Papa from 'papaparse';
 import { useTheme } from '@theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
-import { calculateJointAngles, SensorDataRow } from '../utils/sensorCalculations';
+import { calculateJointAngles, getRelativeQuaternion, SensorDataRow } from '../utils/sensorCalculations';
 import Avatar from '../components/Avatar';
+import type { BodyOrientations } from '../components/Avatar';
+import Slider from '@react-native-community/slider';
+import * as THREE from 'three';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -18,8 +21,65 @@ const MovellaScreen = () => {
     const [sensorData, setSensorData] = useState<Record<string, SensorDataRow[]>>({});
     const [jointAngles, setJointAngles] = useState<number[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [currentFrame, setCurrentFrame] = useState(0);
+    const [bodyOrientations, setBodyOrientations] = useState<BodyOrientations>({});
+
+    useEffect(() => {
+        if (!sensorData || Object.keys(sensorData).length === 0) {
+            return;
+        }
+
+        const fileKeys = Object.keys(sensorData);
+        const getOrientationForFile = (fileIndex: number): THREE.Quaternion | undefined => {
+            if (fileKeys.length <= fileIndex) {
+                return undefined;
+            }
+            const dataPoint = sensorData[fileKeys[fileIndex]][currentFrame];
+            if (!dataPoint) {
+                return undefined;
+            }
+            
+            const w = Number(dataPoint.Quat_W);
+            const x = Number(dataPoint.Quat_X);
+            const y = Number(dataPoint.Quat_Y);
+            const z = Number(dataPoint.Quat_Z);
+
+            if (![w, x, y, z].some(isNaN)) {
+                return new THREE.Quaternion(x, y, z, w).normalize();
+            }
+            return undefined;
+        };
+
+        const pelvisQ = getOrientationForFile(0);
+        const rightThighQ = getOrientationForFile(1);
+        const rightShinQ = getOrientationForFile(2);
+        const leftThighQ = getOrientationForFile(3);
+        const leftShinQ = getOrientationForFile(4);
+
+        if (!pelvisQ) {
+            setBodyOrientations({});
+            return;
+        }
+
+        const newOrientations: BodyOrientations = {
+            pelvis: pelvisQ,
+            rightThigh: rightThighQ ? getRelativeQuaternion(pelvisQ, rightThighQ) : undefined,
+            rightShin: (rightThighQ && rightShinQ) ? getRelativeQuaternion(rightThighQ, rightShinQ) : undefined,
+            leftThigh: leftThighQ ? getRelativeQuaternion(pelvisQ, leftThighQ) : undefined,
+            leftShin: (leftThighQ && leftShinQ) ? getRelativeQuaternion(leftThighQ, leftShinQ) : undefined,
+        };
+
+        setBodyOrientations(newOrientations);
+
+    }, [currentFrame, sensorData]);
 
     const handleFileUpload = async () => {
+        setFileName(null);
+        setSensorData({});
+        setJointAngles([]);
+        setCurrentFrame(0);
+        setBodyOrientations({});
+
         try {
             const result = await DocumentPicker.getDocumentAsync({
                 type: 'application/zip',
@@ -49,11 +109,11 @@ const MovellaScreen = () => {
             const parsedData: Record<string, SensorDataRow[]> = {};
 
             for (const a of Object.keys(zip.files)) {
-              if (zip.files[a].name.endsWith('.csv') || zip.files[a].name.endsWith('.txt')) {
-                const csvData = await zip.files[a].async('text');
-                const { data } = Papa.parse<SensorDataRow>(csvData, { header: true, skipEmptyLines: true, dynamicTyping: true });
-                parsedData[zip.files[a].name] = data;
-              }
+                if (zip.files[a].name.endsWith('.csv') || zip.files[a].name.endsWith('.txt')) {
+                    const csvData = await zip.files[a].async('text');
+                    const { data } = Papa.parse<SensorDataRow>(csvData, { header: true, skipEmptyLines: true, dynamicTyping: true });
+                    parsedData[zip.files[a].name] = data;
+                }
             }
             
             setSensorData(parsedData);
@@ -68,7 +128,6 @@ const MovellaScreen = () => {
     const processSensorData = (data: Record<string, SensorDataRow[]>) => {
         const fileKeys = Object.keys(data);
         if (fileKeys.length >= 2) {
-            // Assuming the first two CSVs are the ones we need for joint calculation
             const angles = calculateJointAngles(data[fileKeys[0]], data[fileKeys[1]]);
             setJointAngles(angles);
         } else {
@@ -82,7 +141,7 @@ const MovellaScreen = () => {
             <View key={fileName} style={[styles.card, { backgroundColor: colors.card }]}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{fileName}</Text>
                 <Text style={{ color: colors.textSecondary }}>{`Found ${data.length} rows of data.`}</Text>
-                {data.length > 0 && (
+                {data.length > 0 && data[0] && (
                     <Text style={{ color: colors.textSecondary, marginTop: 5, fontFamily: 'monospace' }}>
                         {`Columns: ${Object.keys(data[0]).join(', ')}`}
                     </Text>
@@ -97,7 +156,7 @@ const MovellaScreen = () => {
         }
 
         const chartData = {
-            labels: jointAngles.map((_, index) => (index % 10 === 0 ? index.toString() : '')), // Show labels sparsely
+            labels: jointAngles.map((_, index) => (index % 10 === 0 ? index.toString() : '')),
             datasets: [{
                 data: jointAngles,
                 strokeWidth: 2,
@@ -106,8 +165,8 @@ const MovellaScreen = () => {
 
         return (
             <View style={[styles.card, { backgroundColor: colors.card, marginTop: 20 }]}>
-                 <Text style={[styles.cardTitle, { color: colors.text }]}>Joint Angle vs. Time</Text>
-                 <LineChart
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Joint Angle vs. Time</Text>
+                <LineChart
                     data={chartData}
                     width={screenWidth - 64}
                     height={220}
@@ -127,6 +186,38 @@ const MovellaScreen = () => {
             </View>
         );
     };
+
+    const renderDigitalTwin = () => {
+        const fileKeys = Object.keys(sensorData);
+        if (fileKeys.length < 1) {
+            return null;
+        }
+
+        const maxFrames = sensorData[fileKeys[0]]?.length - 1 || 0;
+
+        return (
+            <>
+                <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 10 }]}>Digital Twin</Text>
+                <View style={[styles.card, { backgroundColor: colors.card }]}>
+                    <Avatar orientations={bodyOrientations} />
+                        {maxFrames > 0 && (
+                            <Slider
+                                style={styles.slider}
+                                minimumValue={0}
+                                maximumValue={maxFrames}
+                                step={1}
+                                value={currentFrame}
+                                onValueChange={setCurrentFrame}
+                                minimumTrackTintColor={colors.primary}
+                                maximumTrackTintColor={colors.mediumGray}
+                                thumbTintColor={colors.primary}
+                            />
+                        )}
+                    <Text style={styles.frameText}>Frame: {currentFrame}</Text>
+                </View>
+            </>
+        )
+    }
 
     return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -155,10 +246,7 @@ const MovellaScreen = () => {
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>Parsed Data</Text>
                         {renderDataPreview()}
                         {renderAngleChart()}
-                        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 10 }]}>Digital Twin</Text>
-                        <View style={[styles.card, { backgroundColor: colors.card }]}>
-                           <Avatar />
-                        </View>
+                        {renderDigitalTwin()}
                     </>
                 )}
             </ScrollView>
@@ -216,6 +304,16 @@ const styles = StyleSheet.create({
     chart: {
         marginTop: 10,
         marginLeft: -15,
+    },
+    slider: {
+        width: '100%',
+        height: 40,
+        marginTop: 10,
+    },
+    frameText: {
+        textAlign: 'center',
+        color: '#8E8E93',
+        marginTop: 5,
     }
 });
 

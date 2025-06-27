@@ -17,11 +17,10 @@ export type SensorDataRow = {
  * @param q2 - The second quaternion (e.g., distal sensor like forearm).
  * @returns The relative quaternion.
  */
-function getRelativeQuaternion(q1: THREE.Quaternion, q2: THREE.Quaternion): THREE.Quaternion {
+export function getRelativeQuaternion(q1: THREE.Quaternion, q2: THREE.Quaternion): THREE.Quaternion {
     // The rotation from q1 to q2 is q2 * inverse(q1)
     const q1Inverse = q1.clone().invert();
-    const relativeQuaternion = q2.clone().multiply(q1Inverse);
-    return relativeQuaternion;
+    return q2.clone().multiply(q1Inverse);
 }
 
 /**
@@ -38,7 +37,7 @@ function getAngleFromQuaternion(q: THREE.Quaternion): number {
 
     // Normalize angle to be within [0, 360)
     if (angleDeg >= 360) {
-        angleDeg = angleDeg % 360;
+        angleDeg %= 360;
     }
     
     return angleDeg;

@@ -21,7 +21,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
-    },
+      },
     "extra": {
       "eas": {
         "projectId": "bb7686e9-dae9-483f-8b4c-3f43325bd06c"

@@ -94,8 +94,8 @@ const DoctorTabNavigator = () => {
 
 const AppNavigator = () => {
     const { colors } = useTheme();
-    return (
-        <NavigationContainer>
+  return (
+    <NavigationContainer>
             <Stack.Navigator 
                 initialRouteName="Login"
                 screenOptions={{
@@ -103,8 +103,8 @@ const AppNavigator = () => {
                 }}
             >
                 <Stack.Group>
-                    <Stack.Screen name="Login" component={LoginScreen} />
-                    <Stack.Screen name="Signup" component={SignupScreen} />
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Signup" component={SignupScreen} />
                     <Stack.Screen name="DoctorHome" component={DoctorTabNavigator} />
                     <Stack.Screen name="PatientHome" component={PatientTabNavigator} />
                     <Stack.Screen 
@@ -149,9 +149,9 @@ const AppNavigator = () => {
                         options={{ headerShown: false }}
                     />
                 </Stack.Group>
-            </Stack.Navigator>
-        </NavigationContainer>
-    );
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
 };
 
 export default AppNavigator; 

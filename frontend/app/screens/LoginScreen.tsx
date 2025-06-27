@@ -11,33 +11,33 @@ const LoginScreen = ({ navigation }: any) => {
 
   const handleLogin = () => {
     if (role === 'Doctor') {
-      navigation.navigate('DoctorHome');
-    } else {
-      navigation.navigate('PatientHome');
+        navigation.navigate('DoctorHome');
+      } else {
+        navigation.navigate('PatientHome');
     }
   };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <View style={styles.container}>
+    <View style={styles.container}>
         <Text style={[styles.title, { color: colors.text }]}>Welcome Back</Text>
-        <TextInput
+      <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.mediumGray }]}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
           keyboardType="email-address"
           placeholderTextColor={colors.textSecondary}
-        />
-        <TextInput
+      />
+      <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.mediumGray }]}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
           placeholderTextColor={colors.textSecondary}
-        />
+      />
         <SegmentedControl
           options={['Patient', 'Doctor']}
           selectedValue={role}
@@ -49,7 +49,7 @@ const LoginScreen = ({ navigation }: any) => {
         <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
           <Text style={[styles.linkText, { color: colors.primary }]}>Don't have an account? Sign Up</Text>
         </TouchableOpacity>
-      </View>
+    </View>
       <Image source={require('../../assets/eu.png')} style={styles.footerImage} />
     </SafeAreaView>
   );

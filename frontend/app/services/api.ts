@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // home
-const API_URL = 'http://192.168.1.95:5001';
+const API_URL = 'https://demo-6g2p.onrender.com';
 
 const api = axios.create({
   baseURL: API_URL,

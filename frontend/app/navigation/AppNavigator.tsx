@@ -42,6 +42,13 @@ const PatientTabNavigator = () => {
         }}
       />
       <Tab.Screen 
+        name="Analysis" 
+        component={MovellaScreen} 
+        options={{
+            tabBarIcon: ({ color, size }) => <Ionicons name="analytics-outline" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen 
         name="Profile" 
         component={ProfileScreen} 
         options={{

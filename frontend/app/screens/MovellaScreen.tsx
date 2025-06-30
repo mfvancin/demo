@@ -27,49 +27,68 @@ const MovellaScreen = () => {
     const [verticalRotation, setVerticalRotation] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const animationFrameId = useRef<number | null>(null);
+    const initialOrientations = useRef<Record<string, THREE.Quaternion | undefined>>({});
 
     useEffect(() => {
         if (!sensorData || Object.keys(sensorData).length === 0) {
             return;
         }
 
-        const fileKeys = Object.keys(sensorData);
-        const getOrientationForFile = (fileIndex: number): THREE.Quaternion | undefined => {
+        const getOrientationForFile = (fileIndex: number, frame: number): THREE.Quaternion | undefined => {
+            const fileKeys = Object.keys(sensorData).sort();
             if (fileKeys.length <= fileIndex) {
                 return undefined;
             }
-            const dataPoint = sensorData[fileKeys[fileIndex]][currentFrame];
+
+            const dataPoint = sensorData[fileKeys[fileIndex]][frame];
             if (!dataPoint) {
                 return undefined;
             }
             
-            const w = Number(dataPoint.Quat_W);
-            const x = Number(dataPoint.Quat_X);
-            const y = Number(dataPoint.Quat_Y);
-            const z = Number(dataPoint.Quat_Z);
-
-            if (![w, x, y, z].some(isNaN)) {
-                return new THREE.Quaternion(x, y, z, w).normalize();
+            if (dataPoint.Euler_X != null && dataPoint.Euler_Y != null && dataPoint.Euler_Z != null) {
+                const euler = new THREE.Euler(
+                    THREE.MathUtils.degToRad(dataPoint.Euler_X),
+                    THREE.MathUtils.degToRad(dataPoint.Euler_Y),
+                    THREE.MathUtils.degToRad(dataPoint.Euler_Z),
+                    'ZYX' // Match rotation order from sensorCalculations
+                );
+                return new THREE.Quaternion().setFromEuler(euler);
             }
+
+            if (dataPoint.Quat_W != null && dataPoint.Quat_X != null && dataPoint.Quat_Y != null && dataPoint.Quat_Z != null) {
+                const { Quat_W: w, Quat_X: x, Quat_Y: y, Quat_Z: z } = dataPoint;
+                if (![w, x, y, z].some(isNaN)) {
+                     return new THREE.Quaternion(x, y, z, w).normalize();
+                }
+            }
+            
             return undefined;
         };
+        
+        const initialPelvisQ = initialOrientations.current[0] || (() => {
+            const q = getOrientationForFile(0, 0);
+            if (q) initialOrientations.current[0] = q;
+            return q;
+        })();
 
-        const pelvisQ = getOrientationForFile(0);
-        const rightThighQ = getOrientationForFile(1);
-        const rightShinQ = getOrientationForFile(2);
-        const leftThighQ = getOrientationForFile(3);
-        const leftShinQ = getOrientationForFile(4);
-
-        if (!pelvisQ) {
-            setBodyOrientations({});
+        if (!initialPelvisQ) {
             return;
         }
 
+        const pelvisQ = getOrientationForFile(0, currentFrame);
+        const rightThighQ = getOrientationForFile(1, currentFrame);
+        const rightShinQ = getOrientationForFile(2, currentFrame);
+        const leftThighQ = getOrientationForFile(3, currentFrame);
+        const leftShinQ = getOrientationForFile(4, currentFrame);
+
+        // Calibrate the pelvis's global orientation against its starting orientation
+        const modelPelvisQ = pelvisQ ? initialPelvisQ.clone().invert().multiply(pelvisQ) : undefined;
+        
         const newOrientations: BodyOrientations = {
-            pelvis: pelvisQ,
-            rightThigh: rightThighQ ? getRelativeQuaternion(pelvisQ, rightThighQ) : undefined,
+            pelvis: modelPelvisQ,
+            rightThigh: (pelvisQ && rightThighQ) ? getRelativeQuaternion(pelvisQ, rightThighQ) : undefined,
             rightShin: (rightThighQ && rightShinQ) ? getRelativeQuaternion(rightThighQ, rightShinQ) : undefined,
-            leftThigh: leftThighQ ? getRelativeQuaternion(pelvisQ, leftThighQ) : undefined,
+            leftThigh: (pelvisQ && leftThighQ) ? getRelativeQuaternion(pelvisQ, leftThighQ) : undefined,
             leftShin: (leftThighQ && leftShinQ) ? getRelativeQuaternion(leftThighQ, leftShinQ) : undefined,
         };
 
@@ -120,6 +139,7 @@ const MovellaScreen = () => {
         setBodyOrientations({});
         setHorizontalRotation(0);
         setVerticalRotation(0);
+        initialOrientations.current = {};
 
         try {
             const result = await DocumentPicker.getDocumentAsync({
@@ -151,8 +171,20 @@ const MovellaScreen = () => {
 
             for (const a of Object.keys(zip.files)) {
                 if (zip.files[a].name.endsWith('.csv') || zip.files[a].name.endsWith('.txt')) {
-                    const csvData = await zip.files[a].async('text');
-                    const { data } = Papa.parse<SensorDataRow>(csvData, { header: true, skipEmptyLines: true, dynamicTyping: true });
+                    let csvData = await zip.files[a].async('text');
+                    
+                    // Find header row and slice the data from there to ignore metadata
+                    const headerIndex = csvData.indexOf('PacketCounter');
+                    if (headerIndex !== -1) {
+                        csvData = csvData.substring(headerIndex);
+                    }
+
+                    const { data } = Papa.parse<SensorDataRow>(csvData, { 
+                        header: true, 
+                        skipEmptyLines: true, 
+                        dynamicTyping: true,
+                    });
+
                     parsedData[zip.files[a].name] = data;
                 }
             }

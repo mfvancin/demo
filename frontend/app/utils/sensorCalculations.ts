@@ -2,12 +2,16 @@ import * as THREE from 'three';
 
 /**
  * Represents a single row of parsed sensor data.
+ * Can contain either Quaternion or Euler angle data.
  */
 export type SensorDataRow = {
-    'Quat_W': number;
-    'Quat_X': number;
-    'Quat_Y': number;
-    'Quat_Z': number;
+    'Quat_W'?: number;
+    'Quat_X'?: number;
+    'Quat_Y'?: number;
+    'Quat_Z'?: number;
+    'Euler_X'?: number;
+    'Euler_Y'?: number;
+    'Euler_Z'?: number;
     [key: string]: any;
 };
 
@@ -18,9 +22,9 @@ export type SensorDataRow = {
  * @returns The relative quaternion.
  */
 export function getRelativeQuaternion(q1: THREE.Quaternion, q2: THREE.Quaternion): THREE.Quaternion {
-    // The rotation from q1 to q2 is q2 * inverse(q1)
+    // The rotation from parent q1 to child q2 is inverse(q1) * q2
     const q1Inverse = q1.clone().invert();
-    return q2.clone().multiply(q1Inverse);
+    return q1Inverse.multiply(q2);
 }
 
 /**
@@ -43,6 +47,23 @@ function getAngleFromQuaternion(q: THREE.Quaternion): number {
     return angleDeg;
 }
 
+function eulerToQuaternion(row: SensorDataRow): THREE.Quaternion | null {
+    if (row.Euler_X != null && row.Euler_Y != null && row.Euler_Z != null) {
+        // Convert degrees to radians
+        const euler = new THREE.Euler(
+            THREE.MathUtils.degToRad(row.Euler_X),
+            THREE.MathUtils.degToRad(row.Euler_Y),
+            THREE.MathUtils.degToRad(row.Euler_Z),
+            'ZYX' // Movella/Xsens typically uses ZYX rotation order
+        );
+        return new THREE.Quaternion().setFromEuler(euler);
+    }
+    if (row.Quat_W != null && row.Quat_X != null && row.Quat_Y != null && row.Quat_Z != null) {
+        return new THREE.Quaternion(row.Quat_X, row.Quat_Y, row.Quat_Z, row.Quat_W).normalize();
+    }
+    return null;
+}
+
 /**
  * Processes two sets of sensor data to calculate the relative angle over time.
  * This assumes two sensors are used, one proximal and one distal (e.g., for a single joint).
@@ -55,17 +76,10 @@ export function calculateJointAngles(data1: SensorDataRow[], data2: SensorDataRo
     const numSamples = Math.min(data1.length, data2.length);
 
     for (let i = 0; i < numSamples; i++) {
-        const row1 = data1[i];
-        const row2 = data2[i];
+        const q1 = eulerToQuaternion(data1[i]);
+        const q2 = eulerToQuaternion(data2[i]);
 
-        if (
-            row1 && row2 &&
-            row1.Quat_W != null && row1.Quat_X != null && row1.Quat_Y != null && row1.Quat_Z != null &&
-            row2.Quat_W != null && row2.Quat_X != null && row2.Quat_Y != null && row2.Quat_Z != null
-        ) {
-            const q1 = new THREE.Quaternion(row1.Quat_X, row1.Quat_Y, row1.Quat_Z, row1.Quat_W).normalize();
-            const q2 = new THREE.Quaternion(row2.Quat_X, row2.Quat_Y, row2.Quat_Z, row2.Quat_W).normalize();
-
+        if (q1 && q2) {
             const relativeQ = getRelativeQuaternion(q1, q2);
             const angle = getAngleFromQuaternion(relativeQ);
             

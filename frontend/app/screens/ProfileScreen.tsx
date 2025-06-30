@@ -1,25 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, Switch } from 'react-native';
-import { User } from '../types';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Switch } from 'react-native';
+import { useAuth } from '@context/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
-
-const mockUser: User = {
-  id: '1',
-  name: 'John Doe',
-  email: 'patient@test.com',
-  role: 'patient',
-};
 
 const ProfileScreen = () => {
   const { colors, isDark, toggleTheme } = useTheme();
-  const [user, setUser] = useState<User>(mockUser);
-  const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(user.name);
+  const { user, logout } = useAuth();
 
-  const handleSave = () => {
-    setUser({ ...user, name });
-    setIsEditing(false);
-  };
+  if (!user) {
+    return null; // Or a loading indicator
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -29,11 +19,7 @@ const ProfileScreen = () => {
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={[styles.infoRow, { borderBottomColor: colors.mediumGray }]}>
             <Text style={[styles.label, { color: colors.text }]}>Name</Text>
-            {isEditing ? (
-              <TextInput style={[styles.input, { color: colors.text }]} value={name} onChangeText={setName} />
-            ) : (
-              <Text style={[styles.value, { color: colors.textSecondary }]}>{user.name}</Text>
-            )}
+            <Text style={[styles.value, { color: colors.textSecondary }]}>{user.name}</Text>
           </View>
           <View style={[styles.infoRow, { borderBottomColor: colors.mediumGray }]}>
             <Text style={[styles.label, { color: colors.text }]}>Email</Text>
@@ -57,15 +43,9 @@ const ProfileScreen = () => {
           </View>
         </View>
 
-        {isEditing ? (
-          <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={handleSave}>
-            <Text style={[styles.buttonText, { color: colors.white }]}>Save</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={() => setIsEditing(true)}>
-            <Text style={[styles.buttonText, { color: colors.white }]}>Edit Profile</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity style={[styles.button, { backgroundColor: colors.notification }]} onPress={logout}>
+            <Text style={[styles.buttonText, { color: colors.white }]}>Logout</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

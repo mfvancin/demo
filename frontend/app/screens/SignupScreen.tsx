@@ -1,20 +1,31 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, Alert } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import SegmentedControl from '../components/SegmentedControl';
+import { useAuth } from '@context/AuthContext';
 
 const SignupScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
+  const { signup } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Patient');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = () => {
-    if (role === 'Doctor') {
-        navigation.navigate('DoctorHome');
-      } else {
-        navigation.navigate('PatientHome');
+  const handleSignup = async () => {
+    if (!name || !email || !password) {
+      Alert.alert('Error', 'Please fill in all fields.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await signup(name, email, password, role.toLowerCase() as 'patient' | 'doctor');
+      // Navigation will be handled by AppNavigator
+    } catch (error) {
+      Alert.alert('Signup Failed', 'Could not create account.');
+    } finally {
+      setLoading(false);
     }
   };
 

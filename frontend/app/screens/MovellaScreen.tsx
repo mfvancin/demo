@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert, Dimensions } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
@@ -25,6 +25,8 @@ const MovellaScreen = () => {
     const [bodyOrientations, setBodyOrientations] = useState<BodyOrientations>({});
     const [horizontalRotation, setHorizontalRotation] = useState(0);
     const [verticalRotation, setVerticalRotation] = useState(0);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const animationFrameId = useRef<number | null>(null);
 
     useEffect(() => {
         if (!sensorData || Object.keys(sensorData).length === 0) {
@@ -75,7 +77,42 @@ const MovellaScreen = () => {
 
     }, [currentFrame, sensorData]);
 
+    useEffect(() => {
+        const fileKeys = Object.keys(sensorData);
+        if (fileKeys.length === 0) {
+            return;
+        }
+
+        const maxFramesValue = sensorData[fileKeys[0]]?.length - 1 || 0;
+
+        const animate = () => {
+            setCurrentFrame(prevFrame => {
+                const nextFrame = prevFrame + 1;
+                if (nextFrame > maxFramesValue) {
+                    setIsPlaying(false);
+                    return prevFrame;
+                }
+                return nextFrame;
+            });
+            animationFrameId.current = requestAnimationFrame(animate);
+        };
+
+        if (isPlaying) {
+                    animationFrameId.current = requestAnimationFrame(animate);
+                }
+        else if (animationFrameId.current) {
+                        cancelAnimationFrame(animationFrameId.current);
+                    }
+
+        return () => {
+            if (animationFrameId.current) {
+                cancelAnimationFrame(animationFrameId.current);
+            }
+        };
+    }, [isPlaying, sensorData]);
+
     const handleFileUpload = async () => {
+        setIsPlaying(false);
         setFileName(null);
         setSensorData({});
         setJointAngles([]);
@@ -197,7 +234,7 @@ const MovellaScreen = () => {
             return null;
         }
 
-        const maxFrames = sensorData[fileKeys[0]]?.length - 1 || 0;
+        const maxFramesValue = sensorData[fileKeys[0]]?.length - 1 || 0;
 
         return (
             <>
@@ -208,20 +245,47 @@ const MovellaScreen = () => {
                         horizontalRotation={horizontalRotation}
                         verticalRotation={verticalRotation}
                     />
-                    {maxFrames > 0 && (
+                    <View style={styles.controlsContainer}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (currentFrame >= maxFramesValue) {
+                                    setCurrentFrame(0);
+                                }
+                                setIsPlaying(true);
+                            }}
+                            disabled={isPlaying}
+                        >
+                            <Ionicons name="play" size={32} color={isPlaying ? colors.mediumGray : colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setIsPlaying(false)} disabled={!isPlaying}>
+                            <Ionicons name="pause" size={32} color={!isPlaying ? colors.mediumGray : colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setIsPlaying(false);
+                                setCurrentFrame(0);
+                            }}
+                        >
+                            <Ionicons name="refresh" size={32} color={colors.primary} />
+                        </TouchableOpacity>
+                    </View>
+                    {maxFramesValue > 0 && (
                         <Slider
                             style={styles.slider}
                             minimumValue={0}
-                            maximumValue={maxFrames}
+                            maximumValue={maxFramesValue}
                             step={1}
                             value={currentFrame}
-                            onValueChange={(value) => setCurrentFrame(Math.floor(value))}
+                            onValueChange={(value) => {
+                                setIsPlaying(false);
+                                setCurrentFrame(Math.floor(value));
+                            }}
                             minimumTrackTintColor={colors.primary}
                             maximumTrackTintColor={colors.mediumGray}
                             thumbTintColor={colors.primary}
                         />
                     )}
-                    <Text style={styles.frameText}>Frame: {currentFrame}</Text>
+                    <Text style={styles.frameText}>Frame: {currentFrame} / {maxFramesValue}</Text>
                     
                     <Slider
                         style={styles.slider}
@@ -332,6 +396,12 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         marginBottom: 5,
+    },
+    controlsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+        marginVertical: 15,
     },
     chart: {
         marginTop: 10,

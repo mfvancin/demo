@@ -1,19 +1,30 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, Alert } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import SegmentedControl from '../components/SegmentedControl';
+import { useAuth } from '@context/AuthContext';
 
 const LoginScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Patient');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (role === 'Doctor') {
-        navigation.navigate('DoctorHome');
-      } else {
-        navigation.navigate('PatientHome');
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email and password.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await login(email, password);
+      // Navigation will be handled by AppNavigator based on the user state
+    } catch (error) {
+      Alert.alert('Login Failed', 'Invalid email or password.');
+    } finally {
+      setLoading(false);
     }
   };
 

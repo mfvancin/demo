@@ -3,8 +3,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
 import { useTheme } from '@theme/ThemeContext';
+import { useAuth } from '@context/AuthContext';
 
 import LoginScreen from '@screens/LoginScreen';
 import SignupScreen from '@screens/SignupScreen';
@@ -101,19 +103,36 @@ const DoctorTabNavigator = () => {
 
 const AppNavigator = () => {
     const { colors } = useTheme();
+    const { user, loading } = useAuth();
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
+    }
+
   return (
     <NavigationContainer>
             <Stack.Navigator 
-                initialRouteName="Login"
+                initialRouteName={user ? (user.role === 'doctor' ? 'DoctorHome' : 'PatientHome') : 'Login'}
                 screenOptions={{
                     headerShown: false
                 }}
             >
-                <Stack.Group>
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Signup" component={SignupScreen} />
+            {user ? (
+                <>
                     <Stack.Screen name="DoctorHome" component={DoctorTabNavigator} />
                     <Stack.Screen name="PatientHome" component={PatientTabNavigator} />
+                </>
+            ) : (
+                <>
+                    <Stack.Screen name="Login" component={LoginScreen} />
+                    <Stack.Screen name="Signup" component={SignupScreen} />
+                </>
+            )}
+            <Stack.Group>
                     <Stack.Screen 
                         name="PatientDetail" 
                         component={PatientDetailScreen} 
@@ -148,17 +167,25 @@ const AppNavigator = () => {
                             }
                         }} 
                     />
-                </Stack.Group>
-                <Stack.Group screenOptions={{ presentation: 'modal' }}>
+            </Stack.Group>
+            <Stack.Group screenOptions={{ presentation: 'modal' }}>
                     <Stack.Screen 
                         name="ExerciseDetail" 
                         component={ExerciseDetailScreen}
                         options={{ headerShown: false }}
                     />
-                </Stack.Group>
+            </Stack.Group>
       </Stack.Navigator>
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    }
+});
 
 export default AppNavigator; 

@@ -6,13 +6,15 @@ import * as THREE from 'three';
 
 export interface BodyOrientations {
     torso?: THREE.Quaternion;
-    upperArm?: THREE.Quaternion;
-    forearm?: THREE.Quaternion;
     pelvis?: THREE.Quaternion;
     rightThigh?: THREE.Quaternion;
     rightShin?: THREE.Quaternion;
     leftThigh?: THREE.Quaternion;
     leftShin?: THREE.Quaternion;
+    rightUpperArm?: THREE.Quaternion;
+    rightForearm?: THREE.Quaternion;
+    leftUpperArm?: THREE.Quaternion;
+    leftForearm?: THREE.Quaternion;
 }
 
 interface AvatarProps {

@@ -30,7 +30,49 @@ const MovellaScreen = () => {
     const initialOrientations = useRef<Record<string, THREE.Quaternion | undefined>>({});
 
     useEffect(() => {
+        // This effect runs once when sensorData is populated to capture the initial T-pose
         if (!sensorData || Object.keys(sensorData).length === 0) {
+            initialOrientations.current = {};
+            return;
+        }
+
+        const fileKeys = Object.keys(sensorData).sort();
+        if (fileKeys.length < 5) return;
+
+        const getInitialOrientation = (fileIndex: number): THREE.Quaternion | undefined => {
+            const dataPoint = sensorData[fileKeys[fileIndex]]?.[0];
+            if (!dataPoint) return undefined;
+            
+            if (dataPoint.Quat_W != null && dataPoint.Quat_X != null && dataPoint.Quat_Y != null && dataPoint.Quat_Z != null) {
+                const { Quat_W: w, Quat_X: x, Quat_Y: y, Quat_Z: z } = dataPoint;
+                if (![w, x, y, z].some(isNaN)) {
+                     return new THREE.Quaternion(x, y, z, w).normalize();
+                }
+            }
+            
+            if (dataPoint.Euler_X != null && dataPoint.Euler_Y != null && dataPoint.Euler_Z != null) {
+                const euler = new THREE.Euler(
+                    THREE.MathUtils.degToRad(dataPoint.Euler_X),
+                    THREE.MathUtils.degToRad(dataPoint.Euler_Y),
+                    THREE.MathUtils.degToRad(dataPoint.Euler_Z),
+                    'ZYX'
+                );
+                return new THREE.Quaternion().setFromEuler(euler);
+            }
+
+            return undefined;
+        }
+        
+        const initials: Record<string, THREE.Quaternion | undefined> = {};
+        for(let i = 0; i < 5; i++) {
+            initials[i] = getInitialOrientation(i);
+        }
+        initialOrientations.current = initials;
+        
+    }, [sensorData]);
+
+    useEffect(() => {
+        if (!sensorData || Object.keys(sensorData).length < 5 || Object.keys(initialOrientations.current).length < 5) {
             return;
         }
 
@@ -45,53 +87,65 @@ const MovellaScreen = () => {
                 return undefined;
             }
             
+            if (dataPoint.Quat_W != null && dataPoint.Quat_X != null && dataPoint.Quat_Y != null && dataPoint.Quat_Z != null) {
+                const { Quat_W: w, Quat_X: x, Quat_Y: y, Quat_Z: z } = dataPoint;
+                if (![w, x, y, z].some(isNaN)) {
+                    return new THREE.Quaternion(x, y, z, w).normalize();
+                }
+            }
+
             if (dataPoint.Euler_X != null && dataPoint.Euler_Y != null && dataPoint.Euler_Z != null) {
                 const euler = new THREE.Euler(
                     THREE.MathUtils.degToRad(dataPoint.Euler_X),
                     THREE.MathUtils.degToRad(dataPoint.Euler_Y),
                     THREE.MathUtils.degToRad(dataPoint.Euler_Z),
-                    'ZYX' // Match rotation order from sensorCalculations
+                    'ZYX' 
                 );
                 return new THREE.Quaternion().setFromEuler(euler);
-            }
-
-            if (dataPoint.Quat_W != null && dataPoint.Quat_X != null && dataPoint.Quat_Y != null && dataPoint.Quat_Z != null) {
-                const { Quat_W: w, Quat_X: x, Quat_Y: y, Quat_Z: z } = dataPoint;
-                if (![w, x, y, z].some(isNaN)) {
-                     return new THREE.Quaternion(x, y, z, w).normalize();
-                }
             }
             
             return undefined;
         };
         
-        const initialPelvisQ = initialOrientations.current[0] || (() => {
-            const q = getOrientationForFile(0, 0);
-            if (q) initialOrientations.current[0] = q;
-            return q;
-        })();
+        // Sensor Mapping based on user request and sorted file names:
+        // 0: Chest (Spine) -> Torso
+        // 1: Right Upper Arm
+        // 2: Right Forearm
+        // 3: Right Thigh
+        // 4: Right Shin
+        const s1_t = getOrientationForFile(0, currentFrame);
+        const s2_t = getOrientationForFile(1, currentFrame);
+        const s3_t = getOrientationForFile(2, currentFrame);
+        const s4_t = getOrientationForFile(3, currentFrame);
+        const s5_t = getOrientationForFile(4, currentFrame);
 
-        if (!initialPelvisQ) {
-            return;
-        }
-
-        const pelvisQ = getOrientationForFile(0, currentFrame);
-        const rightThighQ = getOrientationForFile(1, currentFrame);
-        const rightShinQ = getOrientationForFile(2, currentFrame);
-        const leftThighQ = getOrientationForFile(3, currentFrame);
-        const leftShinQ = getOrientationForFile(4, currentFrame);
-
-        // Calibrate the pelvis's global orientation against its starting orientation
-        const modelPelvisQ = pelvisQ ? initialPelvisQ.clone().invert().multiply(pelvisQ) : undefined;
+        const s1_0 = initialOrientations.current[0];
+        const s2_0 = initialOrientations.current[1];
+        const s3_0 = initialOrientations.current[2];
+        const s4_0 = initialOrientations.current[3];
+        const s5_0 = initialOrientations.current[4];
         
+        if (!s1_0 || !s2_0 || !s3_0 || !s4_0 || !s5_0 || !s1_t || !s2_t || !s3_t || !s4_t || !s5_t) {
+            return; // Not all data is available or calibrated
+        }
+        
+        // Calibrated orientations (delta from T-Pose)
+        const delta1 = s1_0.clone().invert().multiply(s1_t); // Torso
+        const delta2 = s2_0.clone().invert().multiply(s2_t); // R Upper Arm
+        const delta3 = s3_0.clone().invert().multiply(s3_t); // R Forearm
+        const delta4 = s4_0.clone().invert().multiply(s4_t); // R Thigh
+        const delta5 = s5_0.clone().invert().multiply(s5_t); // R Shin
+        
+        // Calculate local rotations for the avatar's hierarchy
         const newOrientations: BodyOrientations = {
-            pelvis: modelPelvisQ,
-            rightThigh: (pelvisQ && rightThighQ) ? getRelativeQuaternion(pelvisQ, rightThighQ) : undefined,
-            rightShin: (rightThighQ && rightShinQ) ? getRelativeQuaternion(rightThighQ, rightShinQ) : undefined,
-            leftThigh: (pelvisQ && leftThighQ) ? getRelativeQuaternion(pelvisQ, leftThighQ) : undefined,
-            leftShin: (leftThighQ && leftShinQ) ? getRelativeQuaternion(leftThighQ, leftShinQ) : undefined,
+            pelvis: new THREE.Quaternion(), // Static root
+            torso: delta1,
+            rightUpperArm: delta1.clone().invert().multiply(delta2),
+            rightForearm: delta2.clone().invert().multiply(delta3),
+            rightThigh: delta4, // Local rotation is same as calibrated global, since parent (pelvis) is static
+            rightShin: delta4.clone().invert().multiply(delta5)
         };
-
+        
         setBodyOrientations(newOrientations);
 
     }, [currentFrame, sensorData]);

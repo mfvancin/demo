@@ -19,7 +19,22 @@ const defaultPatientDetails: PatientDetails = {
 const PatientContext = createContext<PatientContextData>({} as PatientContextData);
 
 export const PatientProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [patients, setPatients] = useState<Record<string, Patient>>(mockPatients);
+  // Initialize with mock data and ensure all required fields are present
+  const initialPatients = Object.entries(mockPatients).reduce((acc, [id, patient]) => {
+    acc[id] = {
+      ...patient,
+      details: patient.details || { ...defaultPatientDetails },
+      recovery_process: patient.recovery_process || [],
+      medications: patient.medications || [],
+      weekly_logs: patient.weekly_logs || [],
+      movementData: patient.movementData || [],
+      feedback: patient.feedback || [],
+      healthData: patient.healthData || [],
+    };
+    return acc;
+  }, {} as Record<string, Patient>);
+
+  const [patients, setPatients] = useState<Record<string, Patient>>(initialPatients);
 
   const createPatient = (name: string, specificId?: string): Patient => {
     const newId = specificId || `patient_${Date.now()}`;
@@ -32,7 +47,8 @@ export const PatientProvider: React.FC<{ children: ReactNode }> = ({ children })
       weekly_logs: [],
       movementData: [],
       feedback: [],
-      healthData: []
+      healthData: [],
+      doctor: { id: 'doc1', name: 'Dr. Smith' }, // Default doctor assignment
     };
 
     setPatients(prevPatients => ({
@@ -51,5 +67,9 @@ export const PatientProvider: React.FC<{ children: ReactNode }> = ({ children })
 };
 
 export function usePatients() {
-  return useContext(PatientContext);
+  const context = useContext(PatientContext);
+  if (!context) {
+    throw new Error('usePatients must be used within a PatientProvider');
+  }
+  return context;
 } 

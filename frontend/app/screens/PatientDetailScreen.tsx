@@ -526,13 +526,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 16,
     },
-    rangeMetricValue: {  // Renamed from metricValue
+    rangeMetricValue: {  
         fontSize: 24,
         fontWeight: 'bold',
         marginBottom: 4,
         textAlign: 'center',
     },
-    rangeMetricLabel: {  // Renamed from metricLabel
+    rangeMetricLabel: {  
         fontSize: 14,
         textAlign: 'center',
         color: '#666',

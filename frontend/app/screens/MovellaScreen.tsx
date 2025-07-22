@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Alert, SafeAreaView } from 'react-native';
 import { useTheme } from '@theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
@@ -211,7 +211,6 @@ const MovellaScreen = () => {
     };
 
     const renderAngleChart = () => {
-        // This function was removed from the new_code, so it's removed here.
         return null;
     };
 
@@ -223,10 +222,8 @@ const MovellaScreen = () => {
 
         const maxFrames = Math.max(0, (sensorData[fileKeys[0]]?.length || 1) - 1);
         
-        // Update the maxFramesValue state if it's different
         if (maxFrames !== maxFramesValue) {
             setMaxFramesValue(maxFrames);
-            // Reset current frame when maxFrames changes
             if (currentFrame > maxFrames) {
                 setCurrentFrame(0);
             }
@@ -355,6 +352,7 @@ const MovellaScreen = () => {
             <ScrollView 
                 style={styles.container}
                 contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator={false}
             >
                 <View style={styles.header}>
                     <Text style={[styles.title, { color: colors.text }]}>Live Session</Text>
@@ -430,6 +428,9 @@ const MovellaScreen = () => {
                         {renderRealtimeDataDisplay()}
                     </View>
                 )}
+
+                {/* Add bottom padding to account for tab bar */}
+                <View style={{ height: 80 }} />
             </ScrollView>
         </View>
     );
@@ -493,6 +494,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 16,
         marginBottom: 24,
+        paddingHorizontal: 8,
     },
     playButton: {
         width: 48,

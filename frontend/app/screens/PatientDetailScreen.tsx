@@ -1,22 +1,125 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ChartData } from 'react-native-chart-kit/dist/HelperTypes';
-import { RecoveryProcess, WeeklyLog, Patient, Medication } from '../types';
+import { RecoveryProcess, Patient, Medication, PatientDetails, MovementData } from '../types';
 import { useTheme } from '../theme/ThemeContext';
-import { mockPatients } from '@data/mockPatients';
 import ChartCard from '@components/ChartCard';
 import AssignmentModal from '@components/AssignmentModal';
+import PatientDetailsCard from '@components/PatientDetailsCard';
+import MovementDataDisplay from '@components/MovementDataDisplay';
+import Avatar from '@components/Avatar';
+import { useHealth } from '@context/HealthContext';
+import { usePatients } from '@context/PatientContext';
+import * as DocumentPicker from 'expo-document-picker';
+import movementService from '@services/movementService';
+
+const MotionVisualizerSection = ({ movementData, colors }: { movementData: MovementData, colors: any }) => {
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const maxFrames = movementData.segmentOrientations?.length || 0;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentFrame((prev) => (prev + 1) % maxFrames);
+    }, 50); // 20fps animation
+    return () => clearInterval(interval);
+  }, [maxFrames]);
+
+  const currentOrientation = movementData.segmentOrientations?.[currentFrame];
+
+  return (
+    <View style={[styles.section, { backgroundColor: colors.card }]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Motion Visualization</Text>
+      <View style={styles.avatarContainer}>
+        <Avatar
+          orientations={{
+            rightThigh: currentOrientation?.femur,
+            rightShin: currentOrientation?.tibia,
+            rightFoot: currentOrientation?.foot,
+          }}
+        />
+      </View>
+    </View>
+  );
+};
+
+const MotionMetricsSection = ({ movementData, colors }: { movementData: MovementData, colors: any }) => {
+  // Calculate range of motion metrics
+  const calculateRangeOfMotion = () => {
+    if (!movementData.segmentOrientations?.length) return null;
+
+    let maxKneeFlexion = 0;
+    let maxKneeExtension = 180;
+    let maxAnkleFlexion = 0;
+    let maxAnkleDorsiflexion = 0;
+
+    movementData.segmentOrientations.forEach(orientation => {
+      // Calculate knee angle between femur and tibia
+      const kneeAngle = movementService.calculateJointAngle(orientation.femur, orientation.tibia);
+      maxKneeFlexion = Math.max(maxKneeFlexion, kneeAngle);
+      maxKneeExtension = Math.min(maxKneeExtension, kneeAngle);
+
+      // Calculate ankle angle between tibia and foot
+      const ankleAngle = movementService.calculateJointAngle(orientation.tibia, orientation.foot);
+      if (ankleAngle > 90) {
+        maxAnkleFlexion = Math.max(maxAnkleFlexion, ankleAngle - 90);
+      } else {
+        maxAnkleDorsiflexion = Math.max(maxAnkleDorsiflexion, 90 - ankleAngle);
+      }
+    });
+
+    return {
+      kneeFlexion: maxKneeFlexion.toFixed(1),
+      kneeExtension: maxKneeExtension.toFixed(1),
+      ankleFlexion: maxAnkleFlexion.toFixed(1),
+      ankleDorsiflexion: maxAnkleDorsiflexion.toFixed(1),
+    };
+  };
+
+  const metrics = calculateRangeOfMotion();
+
+  return (
+    <View style={[styles.section, { backgroundColor: colors.card }]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Range of Motion</Text>
+      {metrics ? (
+        <View style={styles.metricsGrid}>
+          <View style={styles.metricItem}>
+            <Text style={[styles.rangeMetricValue, { color: colors.text }]}>{metrics.kneeFlexion}°</Text>
+            <Text style={[styles.rangeMetricLabel, { color: colors.textSecondary }]}>Max Knee Flexion</Text>
+          </View>
+          <View style={styles.metricItem}>
+            <Text style={[styles.rangeMetricValue, { color: colors.text }]}>{metrics.kneeExtension}°</Text>
+            <Text style={[styles.rangeMetricLabel, { color: colors.textSecondary }]}>Max Knee Extension</Text>
+          </View>
+          <View style={styles.metricItem}>
+            <Text style={[styles.rangeMetricValue, { color: colors.text }]}>{metrics.ankleFlexion}°</Text>
+            <Text style={[styles.rangeMetricLabel, { color: colors.textSecondary }]}>Max Ankle Flexion</Text>
+          </View>
+          <View style={styles.metricItem}>
+            <Text style={[styles.rangeMetricValue, { color: colors.text }]}>{metrics.ankleDorsiflexion}°</Text>
+            <Text style={[styles.rangeMetricLabel, { color: colors.textSecondary }]}>Max Dorsiflexion</Text>
+          </View>
+        </View>
+      ) : (
+        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>No motion data available</Text>
+      )}
+    </View>
+  );
+};
 
 const PatientDetailScreen = ({ route, navigation }: any) => {
     const { colors } = useTheme();
     const { patientId, role, completedExerciseId } = route.params;
-    const patientData = mockPatients[patientId];
+    const { patients } = usePatients();
+    const patientData = patients[patientId];
+    const { healthData } = useHealth();
 
     const [exercises, setExercises] = useState<RecoveryProcess[]>([]);
     const [medications, setMedications] = useState<Medication[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [assignmentType, setAssignmentType] = useState<'exercise' | 'medication' | null>(null);
+    const [selectedExercise, setSelectedExercise] = useState<RecoveryProcess | null>(null);
+    const [movementData, setMovementData] = useState(patientData.movementData?.[0]);
 
     useEffect(() => {
         if (patientData) {
@@ -34,8 +137,8 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
 
     const handleToggleComplete = (id: string, type: 'exercise' | 'medication') => {
         if (role !== 'patient') {
-            return;
-        } 
+          return;
+        }
 
         if (type === 'exercise') {
             setExercises(current =>
@@ -59,6 +162,7 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
                 id: `rp${Date.now()}`,
                 name,
                 completed: false,
+                assignedDate: new Date().toISOString(),
             };
             setExercises(current => [...current, newExercise]);
         } else if (assignmentType === 'medication') {
@@ -72,155 +176,191 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
         }
     };
 
-    const getChartData = (logs: WeeklyLog[], key: keyof WeeklyLog): ChartData => {
-        return {
-            labels: logs.map(log => `W${log.week}`),
-            datasets: [{
-                data: logs.map(log => log[key] as number),
-            }]
+    const handleUpdateDetails = (details: Partial<PatientDetails>) => {
+        // In a real app, this would update the backend
+        console.log('Updating patient details:', details);
+    };
+
+    const handleUploadMovementData = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: 'application/zip',
+                copyToCacheDirectory: true,
+            });
+
+            if (!result.canceled && result.assets?.[0]) {
+                const data = await movementService.processZipFile(result.assets[0].uri);
+                if (data.jointPositions || data.segmentOrientations || data.gaitParameters) {
+                    setMovementData({
+                        jointPositions: data.jointPositions || [],
+                        segmentOrientations: data.segmentOrientations || [],
+                        gaitParameters: data.gaitParameters || [],
+                        timestamp: new Date().toISOString(),
+                        exerciseId: selectedExercise?.id || '',
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error uploading movement data:', error);
         }
     };
 
-    if (!patientData) {
-        return (
-            <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-                <View style={styles.container}>
-                    <Text style={[styles.title, { color: colors.text }]}>Patient not found</Text>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
-    const completedCount = exercises.filter(p => p.completed).length;
-    const totalCount = exercises.length;
-    const progress = totalCount > 0 ? completedCount / totalCount : 0;
-
-    const renderRecoveryProcess = ({ item }: { item: RecoveryProcess }) => (
+    const renderExerciseItem = ({ item }: { item: RecoveryProcess }) => (
         <TouchableOpacity 
             style={styles.itemContainer} 
             onPress={() => {
                 if (role === 'patient') {
-                    navigation.navigate('ExerciseDetail', { 
-                        exercise: item,
-                    });
+                    navigation.navigate('ExerciseDetail', { exercise: item });
+                } else {
+                    setSelectedExercise(item);
                 }
             }}
-            disabled={role === 'doctor'}
         >
             <Ionicons
                 name={item.completed ? "checkmark-circle" : "ellipse-outline"}
                 size={28}
                 color={item.completed ? colors.primary : colors.textSecondary}
             />
-            <Text style={item.completed ? [styles.itemTextCompleted, { color: colors.textSecondary }] : [styles.itemText, { color: colors.text }]}>{item.name}</Text>
-        </TouchableOpacity>
-    );
-
-    const renderMedication = ({ item }: { item: Medication }) => (
-        <TouchableOpacity 
-            style={styles.itemContainer}
-            onPress={() => handleToggleComplete(item.id, 'medication')}
-            disabled={role !== 'patient'}
-        >
-             <Ionicons
-                name={item.completed ? "checkmark-circle" : "ellipse-outline"}
-                size={28}
-                color={item.completed ? colors.primary : colors.textSecondary}
-            />
-            <View style={{ marginLeft: 12 }}>
-                <Text style={item.completed ? [styles.itemTextCompleted, { color: colors.textSecondary }] : [styles.itemText, { color: colors.text }]}>{item.name}</Text>
-                <Text style={[styles.itemDosage, { color: colors.textSecondary }]}>{item.dosage}</Text>
+            <View style={styles.exerciseInfo}>
+                <Text style={item.completed ? [styles.itemTextCompleted, { color: colors.textSecondary }] : [styles.itemText, { color: colors.text }]}>
+                    {item.name}
+                </Text>
+                {item.assignedDate && (
+                    <Text style={[styles.assignedDate, { color: colors.textSecondary }]}>
+                        Assigned: {new Date(item.assignedDate).toLocaleDateString()}
+                    </Text>
+                )}
             </View>
         </TouchableOpacity>
     );
 
+    if (!patientData || !patientData.details) {
+        return (
+            <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+                <View style={styles.container}>
+                    <Text style={[styles.title, { color: colors.text }]}>Patient data not found</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-            <ScrollView style={styles.container}>
-                <Text style={[styles.title, { color: colors.text }]}>{patientData.name}'s Plan</Text>
-                {patientData.doctor && (
-                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Assigned by {patientData.doctor.name}</Text>
-                )}
+        <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
+            <ScrollView 
+                style={styles.container}
+                contentContainerStyle={styles.contentContainer}
+            >
+                <PatientDetailsCard
+                    details={patientData.details}
+                    feedback={patientData.feedback}
+                    onUpdateDetails={handleUpdateDetails}
+                    isEditable={role === 'doctor'}
+                />
 
-                <View style={[styles.card, { backgroundColor: colors.card }]}>
-                    <View style={styles.progressContainer}>
-                        <Text style={[styles.progressText, { color: colors.text }]}>{`${completedCount} of ${totalCount} Completed`}</Text>
-                        <View style={[styles.progressBarBackground, { backgroundColor: colors.mediumGray }]}>
-                            <View style={[styles.progressBarFill, { width: `${progress * 100}%`, backgroundColor: colors.primary }]} />
-                        </View>
+                <View style={[styles.section, { backgroundColor: colors.card }]}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Assigned Exercises</Text>
+                        {role === 'doctor' && (
+                            <TouchableOpacity onPress={() => openModal('exercise')}>
+                                <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+                            </TouchableOpacity>
+                        )}
                     </View>
-
                     <FlatList
                         data={exercises}
-                        renderItem={renderRecoveryProcess}
+                        renderItem={renderExerciseItem}
                         keyExtractor={(item) => item.id}
-                        style={styles.list}
                         scrollEnabled={false}
                     />
                 </View>
 
+                {selectedExercise && role === 'doctor' && (
+                    <View style={[styles.section, { backgroundColor: colors.card }]}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Movement Data</Text>
+                            <TouchableOpacity onPress={handleUploadMovementData}>
+                                <Ionicons name="cloud-upload-outline" size={24} color={colors.primary} />
+                            </TouchableOpacity>
+                        </View>
+                        {movementData ? (
+                            <>
+                                <MotionVisualizerSection movementData={movementData} colors={colors} />
+                                <MotionMetricsSection movementData={movementData} colors={colors} />
+                                <MovementDataDisplay
+                                    jointPositions={movementData.jointPositions}
+                                    segmentOrientations={movementData.segmentOrientations}
+                                    gaitParameters={movementData.gaitParameters}
+                                />
+                            </>
+                        ) : (
+                            <Text style={[styles.noDataText, { color: colors.textSecondary }]}>
+                                Upload movement data to view analysis
+                            </Text>
+                        )}
+                    </View>
+                )}
+
                 {medications.length > 0 && (
-                     <View style={[styles.card, { backgroundColor: colors.card }]}>
-                        <Text style={[styles.progressText, { color: colors.text }]}>Medication</Text>
+                    <View style={[styles.section, { backgroundColor: colors.card }]}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Medications</Text>
+                            {role === 'doctor' && (
+                                <TouchableOpacity onPress={() => openModal('medication')}>
+                                    <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
                         <FlatList
                             data={medications}
-                            renderItem={renderMedication}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity 
+                                    style={styles.itemContainer}
+                                    onPress={() => role === 'patient' && handleToggleComplete(item.id, 'medication')}
+                                >
+                                    <Ionicons
+                                        name={item.completed ? "checkmark-circle" : "ellipse-outline"}
+                                        size={28}
+                                        color={item.completed ? colors.primary : colors.textSecondary}
+                                    />
+                                    <View>
+                                        <Text style={item.completed ? [styles.itemTextCompleted, { color: colors.textSecondary }] : [styles.itemText, { color: colors.text }]}>
+                                            {item.name}
+                                        </Text>
+                                        <Text style={[styles.dosage, { color: colors.textSecondary }]}>{item.dosage}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
                             keyExtractor={(item) => item.id}
-                            style={styles.list}
                             scrollEnabled={false}
                         />
                     </View>
                 )}
 
-                {patientData.weekly_logs && (
-                    <>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Weekly Progress</Text>
-                        <ChartCard 
-                            title="Pain Level"
-                            value={`${patientData.weekly_logs[patientData.weekly_logs.length - 1].pain}/10`}
-                            icon={<Ionicons name="bandage-outline" size={20} color={colors.primary} />}
-                            chartData={getChartData(patientData.weekly_logs, 'pain')}
-                        />
-                        <ChartCard 
-                            title="Discomfort Level"
-                            value={`${patientData.weekly_logs[patientData.weekly_logs.length - 1].discomfort}/10`}
-                            icon={<Ionicons name="body-outline" size={20} color={colors.primary} />}
-                            chartData={getChartData(patientData.weekly_logs, 'discomfort')}
-                        />
-                         <ChartCard 
-                            title="Tiredness"
-                            value={`${patientData.weekly_logs[patientData.weekly_logs.length - 1].tiredness}/10`}
-                            icon={<Ionicons name="battery-half-outline" size={20} color={colors.primary} />}
-                            chartData={getChartData(patientData.weekly_logs, 'tiredness')}
-                        />
-                         <ChartCard 
-                            title="Strength"
-                            value={`${patientData.weekly_logs[patientData.weekly_logs.length - 1].strength}/10`}
-                            icon={<Ionicons name="barbell-outline" size={20} color={colors.primary} />}
-                            chartData={getChartData(patientData.weekly_logs, 'strength')}
-                        />
-                    </>
-                )}
-
-                {role === 'patient' ? (
-                    <TouchableOpacity style={[styles.logButton, { backgroundColor: colors.primary }]} onPress={() => navigation.navigate('Logbook')}>
-                        <Text style={[styles.logButtonText, { color: colors.white }]}>Log Weekly Feelings</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <View style={styles.doctorActions}>
-                        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.primary }]} onPress={() => openModal('exercise')}>
-                            <Ionicons name="add-circle-outline" size={22} color={colors.white} />
-                            <Text style={[styles.actionButtonText, { color: colors.white }]}>Assign Exercise</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.primary }]} onPress={() => openModal('medication')}>
-                             <Ionicons name="medkit-outline" size={22} color={colors.white} />
-                            <Text style={[styles.actionButtonText, { color: colors.white }]}>Assign Medication</Text>
-                        </TouchableOpacity>
+                {healthData && (
+                    <View style={[styles.section, { backgroundColor: colors.card }]}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Health Metrics</Text>
+                        <View style={styles.healthMetrics}>
+                            <View style={styles.metric}>
+                                <Ionicons name="walk-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.healthMetricValue, { color: colors.text }]}>{healthData.steps}</Text>
+                                <Text style={[styles.healthMetricLabel, { color: colors.textSecondary }]}>Steps</Text>
+                            </View>
+                            <View style={styles.metric}>
+                                <Ionicons name="flame-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.healthMetricValue, { color: colors.text }]}>{healthData.calories}</Text>
+                                <Text style={[styles.healthMetricLabel, { color: colors.textSecondary }]}>Calories</Text>
+                            </View>
+                            <View style={styles.metric}>
+                                <Ionicons name="time-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.healthMetricValue, { color: colors.text }]}>{healthData.activeMinutes}</Text>
+                                <Text style={[styles.healthMetricLabel, { color: colors.textSecondary }]}>Active Min</Text>
+                            </View>
+                        </View>
                     </View>
                 )}
-
             </ScrollView>
-             {role === 'doctor' && assignmentType && (
+
+            {role === 'doctor' && assignmentType && (
                 <AssignmentModal
                     visible={modalVisible}
                     onClose={() => setModalVisible(false)}
@@ -228,7 +368,7 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
                     assignmentType={assignmentType}
                 />
             )}
-        </SafeAreaView>
+        </View>
     );
 };
 
@@ -238,6 +378,8 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
+    },
+    contentContainer: {
         padding: 16,
     },
     title: {
@@ -279,25 +421,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 12,
         borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
     },
     itemText: {
-        fontSize: 17,
-        marginLeft: 12,
+        fontSize: 16,
+        marginBottom: 4,
     },
     itemTextCompleted: {
-        fontSize: 17,
-        marginLeft: 12,
+        fontSize: 16,
         textDecorationLine: 'line-through',
+        marginBottom: 4,
+    },
+    assignedDate: {
+        fontSize: 12,
     },
     itemDosage: {
         fontSize: 14,
         marginTop: 2,
     },
     sectionTitle: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        marginBottom: 16,
-        marginTop: 16,
+        fontSize: 18,
+        fontWeight: '600',
     },
     logButton: {
         padding: 16,
@@ -325,6 +469,73 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: '600',
         marginLeft: 10,
+    },
+    section: {
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    exerciseInfo: {
+        marginLeft: 12,
+    },
+    dosage: {
+        fontSize: 14,
+        marginTop: 2,
+    },
+    noDataText: {
+        textAlign: 'center',
+        fontSize: 16,
+        marginVertical: 20,
+    },
+    healthMetrics: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginTop: 8,
+    },
+    metric: {
+        alignItems: 'center',
+    },
+    healthMetricValue: {  // Renamed from metricValue
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginTop: 8,
+        marginBottom: 4,
+    },
+    healthMetricLabel: {  // Renamed from metricLabel
+        fontSize: 14,
+    },
+    avatarContainer: {
+        height: 300,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    metricsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        padding: 16,
+    },
+    metricItem: {
+        width: '48%',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    rangeMetricValue: {  // Renamed from metricValue
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginBottom: 4,
+        textAlign: 'center',
+    },
+    rangeMetricLabel: {  // Renamed from metricLabel
+        fontSize: 14,
+        textAlign: 'center',
+        color: '#666',
     },
 });
 

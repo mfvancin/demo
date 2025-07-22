@@ -1,199 +1,122 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert, Dimensions } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
-import JSZip from 'jszip';
-import Papa from 'papaparse';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Alert } from 'react-native';
 import { useTheme } from '@theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
-import { LineChart } from 'react-native-chart-kit';
-import { calculateJointAngles, getRelativeQuaternion, SensorDataRow } from '../utils/sensorCalculations';
-import Avatar, { BodyOrientations } from '../components/Avatar';
 import Slider from '@react-native-community/slider';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import { LineChart } from 'react-native-chart-kit';
+import Avatar, { BodyOrientations } from '@components/Avatar';
+import movementService from '@services/movementService';
+import { SegmentOrientation } from '../types';
 import * as THREE from 'three';
+import JSZip from 'jszip';
+import Papa from 'papaparse';
 
-const screenWidth = Dimensions.get('window').width;
+interface SensorData {
+    Quat_W?: number;
+    Quat_X?: number;
+    Quat_Y?: number;
+    Quat_Z?: number;
+    Euler_X?: number;
+    Euler_Y?: number;
+    Euler_Z?: number;
+    [key: string]: number | undefined;
+}
+
+interface RealtimeData {
+    name: string;
+    orientation?: SegmentOrientation;
+    accel?: { x?: number; y?: number; z?: number };
+    gyro?: { x?: number; y?: number; z?: number };
+}
 
 const MovellaScreen = () => {
     const { colors } = useTheme();
-    const [fileName, setFileName] = useState<string | null>(null);
-    const [sensorData, setSensorData] = useState<Record<string, SensorDataRow[]>>({});
-    const [jointAngles, setJointAngles] = useState<number[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [maxFrames, setMaxFrames] = useState(0);
+    const [currentFile, setCurrentFile] = useState<string | null>(null);
     const [currentFrame, setCurrentFrame] = useState(0);
-    const [bodyOrientations, setBodyOrientations] = useState<BodyOrientations>({});
+    const [maxFramesValue, setMaxFramesValue] = useState(0);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [currentOrientations, setCurrentOrientations] = useState<BodyOrientations>({});
+    const [sensorData, setSensorData] = useState<Record<string, SensorData[]>>({});
     const [horizontalRotation, setHorizontalRotation] = useState(0);
     const [verticalRotation, setVerticalRotation] = useState(0);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const animationFrameId = useRef<number | null>(null);
-    const initialOrientations = useRef<Record<string, THREE.Quaternion | undefined>>({});
 
-    useEffect(() => {
-        // This effect runs once when sensorData is populated to capture the initial T-pose
+    const createSegmentOrientation = (qx: number, qy: number, qz: number, qw: number): SegmentOrientation => {
+        return { qx, qy, qz, qw };
+    };
+
+    const convertToSegmentOrientation = (data: SensorData): SegmentOrientation => {
+        if (data.Quat_W != null && data.Quat_X != null && data.Quat_Y != null && data.Quat_Z != null) {
+            const quat = new THREE.Quaternion(data.Quat_X, data.Quat_Y, data.Quat_Z, data.Quat_W).normalize();
+            return createSegmentOrientation(quat.x, quat.y, quat.z, quat.w);
+        }
+
+        if (data.Euler_X != null && data.Euler_Y != null && data.Euler_Z != null) {
+            const euler = new THREE.Euler(
+                THREE.MathUtils.degToRad(data.Euler_X),
+                THREE.MathUtils.degToRad(data.Euler_Y),
+                THREE.MathUtils.degToRad(data.Euler_Z),
+                'ZYX'
+            );
+            const quat = new THREE.Quaternion().setFromEuler(euler);
+            return createSegmentOrientation(quat.x, quat.y, quat.z, quat.w);
+        }
+
+        return createSegmentOrientation(0, 0, 0, 1);
+    };
+
+    const updateOrientations = (frame: number) => {
         if (!sensorData || Object.keys(sensorData).length === 0) {
-            initialOrientations.current = {};
-            return;
+          return;
         }
 
-        const fileKeys = Object.keys(sensorData).sort();
-        if (fileKeys.length < 5) return;
-
-        const getInitialOrientation = (fileIndex: number): THREE.Quaternion | undefined => {
-            const dataPoint = sensorData[fileKeys[fileIndex]]?.[0];
-            if (!dataPoint) return undefined;
-            
-            if (dataPoint.Quat_W != null && dataPoint.Quat_X != null && dataPoint.Quat_Y != null && dataPoint.Quat_Z != null) {
-                const { Quat_W: w, Quat_X: x, Quat_Y: y, Quat_Z: z } = dataPoint;
-                if (![w, x, y, z].some(isNaN)) {
-                     return new THREE.Quaternion(x, y, z, w).normalize();
+        const newOrientations: BodyOrientations = {};
+        Object.entries(sensorData).forEach(([key, data]) => {
+            if (data[frame]) {
+                const orientation = convertToSegmentOrientation(data[frame]);
+                switch (key) {
+                    case 'thigh':
+                        newOrientations.rightThigh = orientation;
+                        break;
+                    case 'shin':
+                        newOrientations.rightShin = orientation;
+                        break;
+                    // Add more mappings as needed
                 }
             }
-            
-            if (dataPoint.Euler_X != null && dataPoint.Euler_Y != null && dataPoint.Euler_Z != null) {
-                const euler = new THREE.Euler(
-                    THREE.MathUtils.degToRad(dataPoint.Euler_X),
-                    THREE.MathUtils.degToRad(dataPoint.Euler_Y),
-                    THREE.MathUtils.degToRad(dataPoint.Euler_Z),
-                    'ZYX'
-                );
-                return new THREE.Quaternion().setFromEuler(euler);
-            }
+        });
 
-            return undefined;
-        }
-        
-        const initials: Record<string, THREE.Quaternion | undefined> = {};
-        for(let i = 0; i < 5; i++) {
-            initials[i] = getInitialOrientation(i);
-        }
-        initialOrientations.current = initials;
-        
-    }, [sensorData]);
+        setCurrentOrientations(newOrientations);
+    };
 
     useEffect(() => {
-        if (!sensorData || Object.keys(sensorData).length < 5 || Object.keys(initialOrientations.current).length < 5) {
-            return;
-        }
-
-        const getOrientationForFile = (fileIndex: number, frame: number): THREE.Quaternion | undefined => {
-            const fileKeys = Object.keys(sensorData).sort();
-            if (fileKeys.length <= fileIndex) {
-                return undefined;
-            }
-
-            const dataPoint = sensorData[fileKeys[fileIndex]][frame];
-            if (!dataPoint) {
-                return undefined;
-            }
-            
-            if (dataPoint.Quat_W != null && dataPoint.Quat_X != null && dataPoint.Quat_Y != null && dataPoint.Quat_Z != null) {
-                const { Quat_W: w, Quat_X: x, Quat_Y: y, Quat_Z: z } = dataPoint;
-                if (![w, x, y, z].some(isNaN)) {
-                    return new THREE.Quaternion(x, y, z, w).normalize();
-                }
-            }
-
-            if (dataPoint.Euler_X != null && dataPoint.Euler_Y != null && dataPoint.Euler_Z != null) {
-                const euler = new THREE.Euler(
-                    THREE.MathUtils.degToRad(dataPoint.Euler_X),
-                    THREE.MathUtils.degToRad(dataPoint.Euler_Y),
-                    THREE.MathUtils.degToRad(dataPoint.Euler_Z),
-                    'ZYX' 
-                );
-                return new THREE.Quaternion().setFromEuler(euler);
-            }
-            
-            return undefined;
-        };
+        let interval: NodeJS.Timeout | null = null;
         
-        // Sensor Mapping based on user request and sorted file names:
-        // 0: Chest (Spine) -> Torso
-        // 1: Right Upper Arm
-        // 2: Right Forearm
-        // 3: Right Thigh
-        // 4: Right Shin
-        const s1_t = getOrientationForFile(0, currentFrame);
-        const s2_t = getOrientationForFile(1, currentFrame);
-        const s3_t = getOrientationForFile(2, currentFrame);
-        const s4_t = getOrientationForFile(3, currentFrame);
-        const s5_t = getOrientationForFile(4, currentFrame);
-
-        const s1_0 = initialOrientations.current[0];
-        const s2_0 = initialOrientations.current[1];
-        const s3_0 = initialOrientations.current[2];
-        const s4_0 = initialOrientations.current[3];
-        const s5_0 = initialOrientations.current[4];
-        
-        if (!s1_0 || !s2_0 || !s3_0 || !s4_0 || !s5_0 || !s1_t || !s2_t || !s3_t || !s4_t || !s5_t) {
-            return; // Not all data is available or calibrated
+        if (isPlaying && maxFramesValue > 0) {
+            interval = setInterval(() => {
+                setCurrentFrame(prev => {
+                    const next = prev >= maxFramesValue ? 0 : prev + 1;
+                    updateOrientations(next);
+                    return next;
+                });
+            }, 50); // 20fps
         }
         
-        // Calibrated orientations (delta from T-Pose)
-        const delta1 = s1_0.clone().invert().multiply(s1_t); // Torso
-        const delta2 = s2_0.clone().invert().multiply(s2_t); // R Upper Arm
-        const delta3 = s3_0.clone().invert().multiply(s3_t); // R Forearm
-        const delta4 = s4_0.clone().invert().multiply(s4_t); // R Thigh
-        const delta5 = s5_0.clone().invert().multiply(s5_t); // R Shin
-        
-        // Calculate local rotations for the avatar's hierarchy
-        const newOrientations: BodyOrientations = {
-            pelvis: new THREE.Quaternion(), // Static root
-            torso: delta1,
-            rightUpperArm: delta1.clone().invert().multiply(delta2),
-            rightForearm: delta2.clone().invert().multiply(delta3),
-            rightThigh: delta4, // Local rotation is same as calibrated global, since parent (pelvis) is static
-            rightShin: delta4.clone().invert().multiply(delta5)
-        };
-        
-        setBodyOrientations(newOrientations);
-
-    }, [currentFrame, sensorData]);
-
-    useEffect(() => {
-        const fileKeys = Object.keys(sensorData);
-        if (fileKeys.length === 0) {
-            return;
-        }
-
-        const maxFramesValue = sensorData[fileKeys[0]]?.length - 1 || 0;
-
-        const animate = () => {
-            setCurrentFrame(prevFrame => {
-                const nextFrame = prevFrame + 1;
-                if (nextFrame > maxFramesValue) {
-                    setIsPlaying(false);
-                    return prevFrame;
-                }
-                return nextFrame;
-            });
-            animationFrameId.current = requestAnimationFrame(animate);
-        };
-
-        if (isPlaying) {
-                    animationFrameId.current = requestAnimationFrame(animate);
-                }
-        else if (animationFrameId.current) {
-                        cancelAnimationFrame(animationFrameId.current);
-                    }
-
         return () => {
-            if (animationFrameId.current) {
-                cancelAnimationFrame(animationFrameId.current);
+            if (interval) {
+                clearInterval(interval);
             }
         };
-    }, [isPlaying, sensorData]);
+    }, [isPlaying, maxFramesValue]);
 
     const handleFileUpload = async () => {
         setIsPlaying(false);
-        setFileName(null);
+        setCurrentFile(null);
         setSensorData({});
-        setJointAngles([]);
         setCurrentFrame(0);
-        setBodyOrientations({});
-        setHorizontalRotation(0);
-        setVerticalRotation(0);
-        initialOrientations.current = {};
+        setCurrentOrientations({});
+        setMaxFramesValue(0);
 
         try {
             const result = await DocumentPicker.getDocumentAsync({
@@ -202,15 +125,14 @@ const MovellaScreen = () => {
             });
 
             if (result.canceled === false) {
-                setIsLoading(true);
-                setFileName(result.assets[0].name);
+                setCurrentFile(result.assets[0].name);
                 await processZipFile(result.assets[0].uri);
             }
         } catch (error) {
             console.error('Error picking document:', error);
             Alert.alert('Error', 'Failed to pick the document.');
         } finally {
-            setIsLoading(false);
+            // setIsLoading(false); // This line was removed from the new_code, so it's removed here.
         }
     };
 
@@ -221,7 +143,7 @@ const MovellaScreen = () => {
             });
             
             const zip = await JSZip.loadAsync(fileContent, { base64: true });
-            const parsedData: Record<string, SensorDataRow[]> = {};
+            const parsedData: Record<string, SensorData[]> = {};
 
             for (const a of Object.keys(zip.files)) {
                 if (zip.files[a].name.endsWith('.csv') || zip.files[a].name.endsWith('.txt')) {
@@ -233,7 +155,7 @@ const MovellaScreen = () => {
                         csvData = csvData.substring(headerIndex);
                     }
 
-                    const { data } = Papa.parse<SensorDataRow>(csvData, { 
+                    const { data } = Papa.parse<SensorData>(csvData, { 
                         header: true, 
                         skipEmptyLines: true, 
                         dynamicTyping: true,
@@ -244,7 +166,7 @@ const MovellaScreen = () => {
             }
             
             setSensorData(parsedData);
-            processSensorData(parsedData);
+            processData(parsedData);
             Alert.alert('Success', `Successfully parsed ${Object.keys(parsedData).length} file(s) from the ZIP.`);
         } catch (error) {
             console.error('Error processing ZIP file:', error);
@@ -252,66 +174,45 @@ const MovellaScreen = () => {
         }
     };
 
-    const processSensorData = (data: Record<string, SensorDataRow[]>) => {
-        const fileKeys = Object.keys(data);
-        if (fileKeys.length >= 2) {
-            const angles = calculateJointAngles(data[fileKeys[0]], data[fileKeys[1]]);
-            setJointAngles(angles);
+    const processData = (data: Record<string, SensorData[]>) => {
+        const sortedFileKeys = Object.keys(data).sort();
+        if (sortedFileKeys.length >= 2) {
+            const angles = movementService.calculateJointAngle(
+                convertToSegmentOrientation(data[sortedFileKeys[0]][0]),
+                convertToSegmentOrientation(data[sortedFileKeys[1]][0])
+            );
+            // Process angles as needed
         } else {
-            setJointAngles([]);
             Alert.alert('Not Enough Data', 'At least two sensor data files are needed to calculate joint angles.');
         }
     };
 
     const renderDataPreview = () => {
-        return Object.entries(sensorData).map(([fileName, data]) => (
-            <View key={fileName} style={[styles.card, { backgroundColor: colors.card }]}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>{fileName}</Text>
-                <Text style={{ color: colors.textSecondary }}>{`Found ${data.length} rows of data.`}</Text>
-                {data.length > 0 && data[0] && (
-                    <Text style={{ color: colors.textSecondary, marginTop: 5, fontFamily: 'monospace' }}>
-                        {`Columns: ${Object.keys(data[0]).join(', ')}`}
-                    </Text>
-                )}
-            </View>
-        ));
-    };
-
-    const renderAngleChart = () => {
-        if (jointAngles.length === 0) {
+        if (Object.keys(sensorData).length === 0) {
             return null;
         }
 
-        const chartData = {
-            labels: jointAngles.map((_, index) => (index % 10 === 0 ? index.toString() : '')),
-            datasets: [{
-                data: jointAngles,
-                strokeWidth: 2,
-            }]
-        };
-
         return (
-            <View style={[styles.card, { backgroundColor: colors.card, marginTop: 20 }]}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Joint Angle vs. Time</Text>
-                <LineChart
-                    data={chartData}
-                    width={screenWidth - 64}
-                    height={220}
-                    withInnerLines={false}
-                    withOuterLines={false}
-                    chartConfig={{
-                        backgroundColor: colors.card,
-                        backgroundGradientFrom: colors.card,
-                        backgroundGradientTo: colors.card,
-                        decimalPlaces: 1,
-                        color: (opacity = 1) => colors.primary,
-                        labelColor: (opacity = 1) => colors.textSecondary,
-                    }}
-                    bezier
-                    style={styles.chart}
-                />
+            <View style={[styles.section, { backgroundColor: colors.card }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Parsed Data</Text>
+                {Object.entries(sensorData).map(([fileName, data]) => {
+                    const mapping = `Sensor ${Object.keys(sensorData).indexOf(fileName) + 1}`;
+                    return (
+                        <View key={fileName} style={[styles.section, { backgroundColor: colors.card }]}>
+                            <Text style={[styles.sectionTitle, { color: colors.text }]}>{mapping}</Text>
+                            <Text style={[styles.dataValue, { color: colors.textSecondary }]}>
+                                {`${data.length} frames`}
+                            </Text>
+                        </View>
+                    );
+                })}
             </View>
         );
+    };
+
+    const renderAngleChart = () => {
+        // This function was removed from the new_code, so it's removed here.
+        return null;
     };
 
     const renderDigitalTwin = () => {
@@ -320,119 +221,217 @@ const MovellaScreen = () => {
             return null;
         }
 
-        const maxFramesValue = sensorData[fileKeys[0]]?.length - 1 || 0;
+        const maxFrames = Math.max(0, (sensorData[fileKeys[0]]?.length || 1) - 1);
+        
+        // Update the maxFramesValue state if it's different
+        if (maxFrames !== maxFramesValue) {
+            setMaxFramesValue(maxFrames);
+            // Reset current frame when maxFrames changes
+            if (currentFrame > maxFrames) {
+                setCurrentFrame(0);
+            }
+        }
 
         return (
             <>
                 <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 10 }]}>Digital Twin</Text>
                 <View style={[styles.card, { backgroundColor: colors.card }]}>
                     <Avatar 
-                        orientations={bodyOrientations}
+                        orientations={currentOrientations}
                         horizontalRotation={horizontalRotation}
                         verticalRotation={verticalRotation}
                     />
                     <View style={styles.controlsContainer}>
                         <TouchableOpacity
-                            onPress={() => {
-                                if (currentFrame >= maxFramesValue) {
-                                    setCurrentFrame(0);
-                                }
-                                setIsPlaying(true);
-                            }}
-                            disabled={isPlaying}
+                            onPress={() => setIsPlaying(true)}
+                            disabled={isPlaying || maxFrames === 0}
                         >
-                            <Ionicons name="play" size={32} color={isPlaying ? colors.mediumGray : colors.primary} />
+                            <Ionicons name="play" size={32} color={isPlaying || maxFrames === 0 ? colors.mediumGray : colors.primary} />
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setIsPlaying(false)} disabled={!isPlaying}>
+                        <TouchableOpacity 
+                            onPress={() => setIsPlaying(false)} 
+                            disabled={!isPlaying}
+                        >
                             <Ionicons name="pause" size={32} color={!isPlaying ? colors.mediumGray : colors.primary} />
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => {
                                 setIsPlaying(false);
                                 setCurrentFrame(0);
+                                updateOrientations(0);
                             }}
                         >
                             <Ionicons name="refresh" size={32} color={colors.primary} />
                         </TouchableOpacity>
                     </View>
-                    {maxFramesValue > 0 && (
+                    {maxFrames > 0 && (
                         <Slider
                             style={styles.slider}
                             minimumValue={0}
-                            maximumValue={maxFramesValue}
+                            maximumValue={maxFrames}
                             step={1}
-                            value={currentFrame}
-                            onValueChange={(value) => {
+                            value={Math.min(Math.max(0, currentFrame), maxFrames)}
+                            onValueChange={(value: number) => {
+                                const frameNumber = Math.floor(value);
                                 setIsPlaying(false);
-                                setCurrentFrame(Math.floor(value));
+                                setCurrentFrame(frameNumber);
+                                updateOrientations(frameNumber);
                             }}
                             minimumTrackTintColor={colors.primary}
                             maximumTrackTintColor={colors.mediumGray}
                             thumbTintColor={colors.primary}
                         />
                     )}
-                    <Text style={styles.frameText}>Frame: {currentFrame} / {maxFramesValue}</Text>
+                    <Text style={styles.frameText}>Frame: {currentFrame} / {maxFrames}</Text>
                     
                     <Slider
                         style={styles.slider}
                         minimumValue={-180}
                         maximumValue={180}
+                        step={1}
                         value={horizontalRotation}
                         onValueChange={setHorizontalRotation}
                         minimumTrackTintColor={colors.primary}
                         maximumTrackTintColor={colors.mediumGray}
                         thumbTintColor={colors.primary}
                     />
-                    <Text style={styles.frameText}>Horizontal: {horizontalRotation.toFixed(0)}°</Text>
+                    <Text style={styles.frameText}>Horizontal: {horizontalRotation}°</Text>
                     
                     <Slider
                         style={styles.slider}
                         minimumValue={-90}
                         maximumValue={90}
+                        step={1}
                         value={verticalRotation}
                         onValueChange={setVerticalRotation}
                         minimumTrackTintColor={colors.primary}
                         maximumTrackTintColor={colors.mediumGray}
                         thumbTintColor={colors.primary}
                     />
-                    <Text style={styles.frameText}>Vertical: {verticalRotation.toFixed(0)}°</Text>
+                    <Text style={styles.frameText}>Vertical: {verticalRotation}°</Text>
+                </View>
+            </>
+        )
+    }
+
+    const renderRealtimeDataDisplay = () => {
+        if (Object.keys(currentOrientations).length === 0) {
+            return null;
+        }
+
+        const formatValue = (val: number | undefined) => val?.toFixed(3) ?? 'N/A';
+        const formatQuat = (q: SegmentOrientation | undefined) => {
+            if (!q) {
+                return 'N/A';
+            }
+            return `w:${formatValue(q.qw)}, x:${formatValue(q.qx)}, y:${formatValue(q.qy)}, z:${formatValue(q.qz)}`;
+        }
+
+        return (
+            <>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Real-time Data</Text>
+                <View style={[styles.card, { backgroundColor: colors.card, paddingBottom: 20 }]}>
+                    {Object.entries(currentOrientations).map(([key, orientation]) => (
+                        <View key={key} style={styles.dataRowContainer}>
+                            <Text style={[styles.dataRowTitle, { color: colors.text }]}>{key}</Text>
+                            <Text style={[styles.dataRowText, { color: colors.textSecondary }]}>
+                                <Text style={styles.dataLabel}>Orient:</Text> {formatQuat(orientation)}
+                            </Text>
+                            <Text style={[styles.dataRowText, { color: colors.textSecondary }]}>
+                                <Text style={styles.dataLabel}>Accel:</Text> x:{formatValue(undefined)}, y:{formatValue(undefined)}, z:{formatValue(undefined)}
+                            </Text>
+                            <Text style={[styles.dataRowText, { color: colors.textSecondary }]}>
+                                <Text style={styles.dataLabel}>Gyro:</Text> x:{formatValue(undefined)}, y:{formatValue(undefined)}, z:{formatValue(undefined)}
+                            </Text>
+                        </View>
+                    ))}
                 </View>
             </>
         )
     }
 
     return (
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-            <ScrollView style={styles.container}>
-                <Text style={[styles.title, { color: colors.text }]}>Movella Data Analysis</Text>
-
-                <TouchableOpacity 
-                    style={[styles.uploadButton, { backgroundColor: colors.primary }]} 
-                    onPress={handleFileUpload}
-                    disabled={isLoading}
-                >
-                    <Ionicons name="cloud-upload-outline" size={22} color={colors.white} />
-                    <Text style={[styles.uploadButtonText, { color: colors.white }]}>
-                        {isLoading ? 'Processing...' : 'Upload .zip File'}
+        <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
+            <ScrollView 
+                style={styles.container}
+                contentContainerStyle={styles.contentContainer}
+            >
+                <View style={styles.header}>
+                    <Text style={[styles.title, { color: colors.text }]}>Live Session</Text>
+                    <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                        Upload and analyze your movement data
                     </Text>
-                </TouchableOpacity>
+                </View>
 
-                {fileName && !isLoading && (
-                    <Text style={styles.fileNameText}>
-                        Processed: <Text style={{ fontWeight: 'bold' }}>{fileName}</Text>
-                    </Text>
-                )}
-                
-                {Object.keys(sensorData).length > 0 && (
-                    <>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Parsed Data</Text>
-                        {renderDataPreview()}
-                        {renderAngleChart()}
-                        {renderDigitalTwin()}
-                    </>
+                <View style={[styles.section, { backgroundColor: colors.card }]}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Movement Data</Text>
+                        <TouchableOpacity 
+                            style={[styles.uploadButton, { backgroundColor: colors.purple[500] }]}
+                            onPress={handleFileUpload}
+                        >
+                            <Ionicons name="cloud-upload-outline" size={20} color={colors.white} />
+                            <Text style={[styles.buttonText, { color: colors.white }]}>Upload Data</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {currentFile ? (
+                        <>
+                            <View style={styles.avatarContainer}>
+                                <Avatar orientations={currentOrientations} />
+                            </View>
+
+                            <View style={styles.controlsContainer}>
+                                <TouchableOpacity 
+                                    style={[styles.playButton, { backgroundColor: colors.purple[500] }]}
+                                    onPress={() => setIsPlaying(!isPlaying)}
+                                >
+                                    <Ionicons 
+                                        name={isPlaying ? "pause" : "play"} 
+                                        size={24} 
+                                        color={colors.white} 
+                                    />
+                                </TouchableOpacity>
+                                <Slider
+                                    style={styles.slider}
+                                    minimumValue={0}
+                                    maximumValue={maxFramesValue}
+                                    step={1}
+                                    value={currentFrame}
+                                    onValueChange={(value: number) => {
+                                        setIsPlaying(false);
+                                        setCurrentFrame(Math.floor(value));
+                                    }}
+                                    minimumTrackTintColor={colors.purple[500]}
+                                    maximumTrackTintColor={colors.mediumGray}
+                                    thumbTintColor={colors.purple[500]}
+                                />
+                            </View>
+
+                            {renderDataPreview()}
+                        </>
+                    ) : (
+                        <View style={styles.placeholderContainer}>
+                            <Ionicons 
+                                name="cloud-upload" 
+                                size={48} 
+                                color={colors.textSecondary} 
+                            />
+                            <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
+                                Upload a movement data file to begin analysis
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
+                {currentFile && (
+                    <View style={[styles.section, { backgroundColor: colors.card }]}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Real-time Data</Text>
+                        {renderRealtimeDataDisplay()}
+                    </View>
                 )}
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 };
 
@@ -442,90 +441,138 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
+    },
+    contentContainer: {
         padding: 16,
+    },
+    header: {
+        marginBottom: 24,
     },
     title: {
         fontSize: 34,
         fontWeight: 'bold',
-        marginBottom: 20,
+        marginBottom: 8,
     },
-    uploadButton: {
-        padding: 16,
+    subtitle: {
+        fontSize: 16,
+        marginBottom: 24,
+    },
+    section: {
         borderRadius: 12,
-        alignItems: 'center',
+        padding: 16,
+        marginBottom: 16,
+    },
+    sectionHeader: {
         flexDirection: 'row',
-        justifyContent: 'center',
-    },
-    uploadButtonText: {
-        fontSize: 17,
-        fontWeight: '600',
-        marginLeft: 10,
-    },
-    fileNameText: {
-        textAlign: 'center',
-        marginTop: 15,
-        fontSize: 14,
-        color: '#6E6E73',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 22,
+        fontSize: 20,
+        fontWeight: '600',
+    },
+    uploadButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        gap: 8,
+    },
+    buttonText: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    avatarContainer: {
+        height: 300,
+        marginBottom: 16,
+    },
+    controlsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+        marginBottom: 24,
+    },
+    playButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    slider: {
+        flex: 1,
+        height: 40,
+    },
+    placeholderContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 48,
+        gap: 16,
+    },
+    placeholderText: {
+        fontSize: 16,
+        textAlign: 'center',
+    },
+    dataGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginTop: 16,
+    },
+    dataItem: {
+        flex: 1,
+        minWidth: '45%',
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        padding: 12,
+        borderRadius: 8,
+    },
+    dataLabel: {
+        fontSize: 14,
+        marginBottom: 4,
+    },
+    dataValue: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    chartContainer: {
+        marginTop: 24,
+        marginBottom: 16,
+    },
+    chartTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 16,
+    },
+    dataRowContainer: {
+        marginBottom: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        paddingBottom: 10,
+    },
+    dataRowTitle: {
+        fontSize: 16,
         fontWeight: 'bold',
-        marginTop: 30,
-        marginBottom: 10,
+        marginBottom: 5,
+    },
+    dataRowText: {
+        fontFamily: 'monospace',
+        fontSize: 12,
+        lineHeight: 18,
     },
     card: {
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
-    },
-    cardTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        marginBottom: 5,
-    },
-    controlsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        marginVertical: 15,
-    },
-    chart: {
-        marginTop: 10,
-        marginLeft: -15,
-    },
-    slider: {
-        width: '100%',
-        height: 40,
-        marginTop: 10,
+        backgroundColor: 'transparent',
     },
     frameText: {
-        textAlign: 'center',
-        color: '#8E8E93',
-        marginTop: 5,
-    },
-    button: {
-        marginBottom: 10,
-    },
-    chartContainer: {
-        marginTop: 20,
-    },
-    sliderContainer: {
-        marginTop: 15,
-        alignItems: 'center',
-    },
-    sliderLabel: {
-        fontSize: 16,
-        color: '#666',
-    },
-    sliderValue: {
-        marginTop: 5,
         fontSize: 14,
-        color: '#333',
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: 8,
     },
-    dataRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    }
 });
 
 export default MovellaScreen; 

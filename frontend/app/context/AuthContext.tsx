@@ -1,71 +1,93 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as authService from '@services/auth';
 import { User } from '../types';
-import api from '../services/api';
 
 interface AuthContextData {
   user: User | null;
   loading: boolean;
-  login(email: string, password: string): Promise<void>;
+  login(email: string, password: string, role: 'patient' | 'doctor'): Promise<void>;
   signup(name: string, email: string, password: string, role: 'patient' | 'doctor'): Promise<void>;
   logout(): void;
 }
 
-const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+interface AuthProviderProps {
+  children: React.ReactNode;
+  onPatientSignup?: (name: string, userId: string) => void;
+}
 
-export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
-  useEffect(() => {
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children, onPatientSignup }) => {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadStorageData();
+    }, []);
+
     const loadStorageData = async () => {
-      const storedUser = await AsyncStorage.getItem('@iRHIS:user');
-      const storedToken = await AsyncStorage.getItem('@iRHIS:token');
+        try {
+            const storedUser = await AsyncStorage.getItem('@iRHIS:user');
+            const storedToken = await AsyncStorage.getItem('@iRHIS:token');
+            
+            if (storedUser && storedToken) {
+                setUser(JSON.parse(storedUser));
+            }
+        } catch (error) {
+            console.error('Error loading storage data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-      if (storedUser && storedToken) {
-        setUser(JSON.parse(storedUser));
-        api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-      }
-      setLoading(false);
-    }
-    loadStorageData();
-  }, []);
+    const login = async (email: string, password: string, role: 'patient' | 'doctor') => {
+        try {
+            const response = await authService.login(email, password, role);
+            setUser(response.user);
+            await AsyncStorage.setItem('@iRHIS:user', JSON.stringify(response.user));
+            await AsyncStorage.setItem('@iRHIS:token', response.token);
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error;
+        }
+    };
 
-  const login = async (email: string, password: string) => {
-    const response = await api.post('/login', { email, password });
-    const { token, user: apiUser } = response.data;
+    const signup = async (name: string, email: string, password: string, role: 'patient' | 'doctor') => {
+        try {
+            const response = await authService.signup(name, email, password, role);
+            
+            // If this is a new patient user, create their patient record
+            if (role === 'patient' && response.user && onPatientSignup) {
+                onPatientSignup(name, response.user.id);
+            }
+            
+            setUser(response.user);
+            await AsyncStorage.setItem('@iRHIS:user', JSON.stringify(response.user));
+            await AsyncStorage.setItem('@iRHIS:token', response.token);
+        } catch (error) {
+            console.error('Signup error:', error);
+            throw error;
+        }
+    };
 
-    setUser(apiUser);
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    const logout = async () => {
+        try {
+            await AsyncStorage.removeItem('@iRHIS:user');
+            await AsyncStorage.removeItem('@iRHIS:token');
+            setUser(null);
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+    };
 
-    await AsyncStorage.setItem('@iRHIS:user', JSON.stringify(apiUser));
-    await AsyncStorage.setItem('@iRHIS:token', token);
-  };
-
-  const signup = async (name: string, email: string, password: string, role: 'patient' | 'doctor') => {
-    const response = await api.post('/signup', { name, email, password, role });
-    const { token, user: apiUser } = response.data;
-
-    setUser(apiUser);
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-    await AsyncStorage.setItem('@iRHIS:user', JSON.stringify(apiUser));
-    await AsyncStorage.setItem('@iRHIS:token', token);
-  };
-
-  const logout = async () => {
-    await AsyncStorage.removeItem('@iRHIS:user');
-    await AsyncStorage.removeItem('@iRHIS:token');
-    setUser(null);
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+    return (
+        <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+            {children}
+        </AuthContext.Provider>
+    );
 };
 
 export function useAuth() {
-  return useContext(AuthContext);
+    return useContext(AuthContext);
 } 

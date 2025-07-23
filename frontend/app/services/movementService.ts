@@ -15,15 +15,11 @@ const eulerToQuaternion = (x: number, y: number, z: number) => {
 };
 
 export const calculateJointAngle = (q1: THREE.Quaternion, q2: THREE.Quaternion) => {
-    // Convert quaternions to forward vectors (assuming sensors are aligned with limb's long axis)
     const v1 = new THREE.Vector3(0, 1, 0).applyQuaternion(q1);
     const v2 = new THREE.Vector3(0, 1, 0).applyQuaternion(q2);
-    
-    // Calculate the angle between the vectors
     const angle = v1.angleTo(v2);
     const degrees = THREE.MathUtils.radToDeg(angle);
     
-    // Convert to anatomical angle (180° is straight leg, 90° is flexed)
     return 180 - degrees;
 };
 
@@ -59,42 +55,37 @@ export const processZipFile = async (uri: string): Promise<ZipFileData> => {
 const parseSensorFile = (fileContent: string): any[] => {
     const lines = fileContent.replace(/\r\n/g, '\n').split('\n');
     
-    // Find the start of actual data (after metadata)
     let dataStartIndex = 0;
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        // Look for a line that starts with a number or contains typical header columns
         if (/^\d/.test(line) || /PacketCounter|SampleTimeFine|Quat_|Euler_/.test(line)) {
             dataStartIndex = i;
             break;
         }
     }
 
-    // Extract and clean the header line
     const headerLine = lines[dataStartIndex].trim()
-        .replace(/\s+/g, ',')  // Replace multiple spaces with commas
-        .replace(/[,]+/g, ',') // Replace multiple commas with single comma
-        .replace(/^,|,$/g, ''); // Remove leading/trailing commas
+        .replace(/\s+/g, ',')  
+        .replace(/[,]+/g, ',') 
+        .replace(/^,|,$/g, ''); 
 
     const headers = headerLine.split(',').map(h => h.trim());
     
     const dataRows = [];
-    // Process each data line
     for (let i = dataStartIndex + 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line || line.startsWith('//') || line.startsWith('#')) {
             continue;
         }
 
-        // Clean and split the data line
         const values = line
-            .replace(/\s+/g, ',')  // Replace multiple spaces with commas
-            .replace(/[,]+/g, ',') // Replace multiple commas with single comma
-            .replace(/^,|,$/g, '') // Remove leading/trailing commas
+            .replace(/\s+/g, ',')  
+            .replace(/[,]+/g, ',') 
+            .replace(/^,|,$/g, '') 
             .split(',')
             .map(v => v.trim());
 
-        if (values.length >= 4) {  // Ensure we have at least some valid data
+        if (values.length >= 4) {  
             const rowData: { [key: string]: any } = {};
             headers.forEach((header, index) => {
                 if (index < values.length) {
@@ -157,20 +148,28 @@ export const analyzeMovementData = async (uri: string, exerciseType: 'Squat' | '
     }
 };
 
-const findPeaks = (data: number[], threshold: number, distance: number) => {
-    const peaks: number[] = [];
+const findPeaks = (data: number[], threshold: number, distance: number, exerciseType: 'Squat' | 'Leg Knee Extension') => {
+    const peaks: { index: number; angle: number }[] = [];
+
     for (let i = 1; i < data.length - 1; i++) {
-        // For squats, we're looking for valleys (flexion points) rather than peaks
-        // Typical squat goes below 100° at the bottom
-        const isValley = data[i] < threshold && data[i] < data[i - 1] && data[i] < data[i + 1];
-        if (isValley && (peaks.length === 0 || i - peaks[peaks.length - 1] > distance)) {
-              peaks.push(i);
+        if (exerciseType === 'Squat') {
+            const isValley = data[i] < threshold && data[i] < data[i - 1] && data[i] < data[i + 1];
+            if (isValley && (peaks.length === 0 || i - peaks[peaks.length - 1].index > distance)) {
+                peaks.push({ index: i, angle: data[i] });
+            }
+        } else {
+            const isPeak = data[i] > threshold && data[i] > data[i - 1] && data[i] > data[i + 1];
+            if (isPeak && (peaks.length === 0 || i - peaks[peaks.length - 1].index > distance)) {
+                peaks.push({ index: i, angle: data[i] });
+            }
         }
     }
-    return peaks.length;
+
+    console.log(`Found ${peaks.length} ${exerciseType} repetitions`);
+    return peaks;
 };
 
-const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }) => {
+const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }, exerciseType: 'Squat' | 'Leg Knee Extension') => {
     const sensorKeys = Object.keys(sensorData).sort();
     if (sensorKeys.length < 2) {
         throw new Error("At least two sensor files are required for angle calculation.");
@@ -182,15 +181,12 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }) => {
     const jointAngles: number[] = [];
     const numFrames = Math.min(thighData.length, shinData.length);
 
-    console.log('Processing frames:', numFrames);
-    console.log('Sample thigh data:', thighData[0]);
-    console.log('Sample shin data:', shinData[0]);
+    console.log(`Processing ${exerciseType} data:`, numFrames, 'frames');
 
     for (let i = 0; i < numFrames; i++) {
         const thighRow = thighData[i];
         const shinRow = shinData[i];
 
-        // Prefer quaternion data if available, otherwise use Euler angles
         let q1, q2;
 
         if (thighRow.Quat_W != null) {
@@ -225,7 +221,6 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }) => {
 
         const angle = calculateJointAngle(q1, q2);
         
-        // Validate angle is within reasonable range for knee joint
         if (angle >= 0 && angle <= 180) {
             jointAngles.push(angle);
         }
@@ -243,16 +238,22 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }) => {
         };
     }
 
-    // Log some statistics to help debug
-    console.log('Angle statistics:');
-    console.log('Min angle:', Math.min(...jointAngles));
-    console.log('Max angle:', Math.max(...jointAngles));
-    console.log('Average angle:', jointAngles.reduce((a, b) => a + b, 0) / jointAngles.length);
-
     const maxExtensionAngle = Math.max(...jointAngles);
     const maxFlexionAngle = Math.min(...jointAngles);
-    // Count reps when knee flexes past 100° (typical for squats)
-    const repetitionCount = findPeaks(jointAngles, 100, 20);
+
+    let repThreshold;
+    if (exerciseType === 'Squat') {
+        // Keep fixed threshold for squats as it's working reliably
+        repThreshold = 100; 
+    } else {
+        // Dynamic threshold for leg extensions: 80% of the patient's actual ROM for this session
+        repThreshold = maxFlexionAngle + (maxExtensionAngle - maxFlexionAngle) * 0.8;
+    }
+
+    console.log(`Using ${exerciseType} threshold: ${repThreshold.toFixed(1)}° based on ROM: ${maxFlexionAngle.toFixed(1)}° - ${maxExtensionAngle.toFixed(1)}°`);
+    
+    const peaks = findPeaks(jointAngles, repThreshold, 20, exerciseType);
+    const repetitionCount = peaks.length;
 
     return {
         jointAngles,
@@ -265,11 +266,11 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }) => {
 };
 
 const calculateSquatMetrics = (sensorData: { [key: string]: any[] }) => {
-    return calculateMetricsForExercise(sensorData);
+    return calculateMetricsForExercise(sensorData, 'Squat');
 };
 
 const calculateLegKneeExtensionMetrics = (sensorData: { [key: string]: any[] }) => {
-    return calculateMetricsForExercise(sensorData);
+    return calculateMetricsForExercise(sensorData, 'Leg Knee Extension');
 };
 
 const movementService = {

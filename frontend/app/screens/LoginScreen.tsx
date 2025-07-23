@@ -38,7 +38,7 @@ const LoginScreen = ({ navigation }: any) => {
         style={styles.container}
       >
         <View style={styles.header}>
-          <Image source={require('../../assets/eucip.png')} style={styles.logo} />
+          <Image source={require('../../assets/logo.png')} style={styles.logo} />
           <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>Welcome back to</Text>
           <Text style={[styles.title, { color: colors.text }]}>TwinRehab</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>

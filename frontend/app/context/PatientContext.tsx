@@ -8,6 +8,7 @@ interface PatientContextData {
   loading: boolean;
   fetchPatients: () => Promise<void>;
   assignPatient: (patientId: string) => Promise<void>;
+  updatePatient: (patient: Patient) => void;
 }
 
 export const PatientContext = createContext<PatientContextData>({
@@ -15,6 +16,7 @@ export const PatientContext = createContext<PatientContextData>({
   loading: true,
   fetchPatients: async () => {},
   assignPatient: async () => {},
+  updatePatient: () => {},
 });
 
 export const PatientProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -58,8 +60,15 @@ export const PatientProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const updatePatient = (updatedPatient: Patient) => {
+    setPatients(prevPatients => ({
+      ...prevPatients,
+      [updatedPatient.id]: updatedPatient,
+    }));
+  };
+
   return (
-    <PatientContext.Provider value={{ patients, loading, fetchPatients, assignPatient }}>
+    <PatientContext.Provider value={{ patients, loading, fetchPatients, assignPatient, updatePatient }}>
       {children}
     </PatientContext.Provider>
   );

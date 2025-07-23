@@ -37,7 +37,10 @@ patients = {
     '1': { 
         "id": '1', 
         "name": 'John Doe', 
-        "recovery_process": [],
+        "recovery_process": [
+            { "id": "rp1", "name": "Knee Bends", "completed": True, "targetRepetitions": 12, "targetSets": 3, "instructions": "Go slow and steady." },
+            { "id": "rp2", "name": "Leg Raises", "completed": False, "targetRepetitions": 15, "targetSets": 3, "instructions": "Keep your leg straight." },
+        ],
         "details": {
             "age": 65, "sex": "Male", "height": 1.8, "weight": 85, "bmi": 26.2,
             "clinicalInfo": "Post-op recovery from total knee replacement. Reports mild pain and swelling."
@@ -46,7 +49,9 @@ patients = {
     '2': { 
         "id": '2', 
         "name": 'Jane Smith', 
-        "recovery_process": [],
+        "recovery_process": [
+            { "id": "rp3", "name": "Shoulder Pendulum", "completed": True, "targetRepetitions": 10, "targetSets": 4, "instructions": "Let your arm hang and swing gently." },
+        ],
         "details": {
             "age": 42, "sex": "Female", "height": 1.65, "weight": 60, "bmi": 22.0,
             "clinicalInfo": "ACL reconstruction on the left knee. Currently non-weight bearing."
@@ -66,7 +71,7 @@ patients = {
 }
 
 doctors_patients = {
-    'doc1': ['1', '2', '3'] # Assign all detailed patients to Dr. Smith
+    'doc1': ['1', '2', '3'] 
 }
 
 def token_required(f):
@@ -238,6 +243,48 @@ def assign_doctor(current_user, patient_id):
         doctors_patients[doctor_id].append(patient_id)
 
     return jsonify({"message": "Patient assigned successfully"})
+
+@app.route('/patients/<patient_id>/recovery-process', methods=['PUT'])
+@token_required
+def update_recovery_process(current_user, patient_id):
+    if current_user['role'] != 'doctor':
+        return jsonify({"error": "Only doctors can update exercises"}), 403
+
+    if patient_id not in patients:
+        return jsonify({"error": "Patient not found"}), 404
+    
+    data = request.get_json()
+    if not isinstance(data, list):
+        return jsonify({"error": "Invalid data format, expected a list of exercises"}), 400
+    
+    patients[patient_id]['recovery_process'] = data
+    
+    return jsonify(patients[patient_id])
+
+@app.route('/patients/<patient_id>/details', methods=['PUT'])
+@token_required
+def update_patient_details(current_user, patient_id):
+    if current_user['role'] != 'doctor':
+        return jsonify({"error": "Only doctors can update patient details"}), 403
+
+    if patient_id not in patients:
+        return jsonify({"error": "Patient not found"}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing data"}), 400
+
+    patient_details = patients[patient_id].get('details', {})
+    patient_details.update(data)
+    patients[patient_id]['details'] = patient_details
+    
+    if 'weight' in data or 'height' in data:
+        weight = patient_details.get('weight', 0)
+        height = patient_details.get('height', 0)
+        if height > 0 and weight > 0:
+            patients[patient_id]['details']['bmi'] = weight / (height * height)
+
+    return jsonify(patients[patient_id])
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

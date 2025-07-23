@@ -1,5 +1,5 @@
 import api from './api';
-import type { Patient } from '../types/index';
+import type { Patient, PatientDetails, RecoveryProcess } from '../types/index';
 import axios from 'axios';
 
 export const getPatientsForDoctor = async (doctorId: string): Promise<Patient[]> => {
@@ -40,6 +40,26 @@ export const assignPatientToDoctor = async (patientId: string): Promise<void> =>
         await api.post(`/patients/${patientId}/assign-doctor`);
     } catch (error) {
         console.error('Failed to assign patient to doctor:', error);
+        throw error;
+    }
+};
+
+export const updatePatientDetails = async (patientId: string, details: Partial<PatientDetails>): Promise<Patient> => {
+    try {
+        const response = await api.put(`/patients/${patientId}/details`, details);
+        return response.data;
+    } catch (error) {
+        console.error('Failed to update patient details:', error);
+        throw error;
+    }
+};
+
+export const updateRecoveryProcess = async (patientId: string, recoveryProcess: RecoveryProcess[]): Promise<Patient> => {
+    try {
+        const response = await api.put(`/patients/${patientId}/recovery-process`, recoveryProcess);
+        return response.data;
+    } catch (error) {
+        console.error('Failed to update recovery process:', error);
         throw error;
     }
 };

@@ -1,179 +1,231 @@
+import * as THREE from 'three';
+import { ZipFileData, JointPositions, SegmentOrientations, GaitParameters } from '../types';
 import * as FileSystem from 'expo-file-system';
 import JSZip from 'jszip';
-import Papa from 'papaparse';
-import { Quaternion, Euler, Vector3, MathUtils } from 'three';
-import { 
-    ZipFileData, 
-    JointPositions, 
-    SegmentOrientations, 
-    GaitParameters, 
-    SegmentOrientation 
-} from '../types';
+import * as Papa from 'papaparse';
 
-class MovementService {
-  private static instance: MovementService;
+const eulerToQuaternion = (x: number, y: number, z: number) => {
+    const euler = new THREE.Euler(
+        THREE.MathUtils.degToRad(x),
+        THREE.MathUtils.degToRad(y),
+        THREE.MathUtils.degToRad(z),
+        'ZYX'
+    );
+    return new THREE.Quaternion().setFromEuler(euler);
+};
 
-  private constructor() {}
+export const calculateJointAngle = (q1: THREE.Quaternion, q2: THREE.Quaternion) => {
+    const qRelative = q1.clone().invert().multiply(q2);
+    const angle = 2 * Math.atan2(new THREE.Vector3(qRelative.x, qRelative.y, qRelative.z).length(), qRelative.w);
+    return THREE.MathUtils.radToDeg(angle);
+};
 
-  public static getInstance(): MovementService {
-    if (!MovementService.instance) {
-      MovementService.instance = new MovementService();
-    }
-    return MovementService.instance;
-  }
-
-  public async processZipFile(uri: string): Promise<ZipFileData> {
+export const processZipFile = async (uri: string): Promise<ZipFileData> => {
     try {
-      // Read the zip file
-      const fileContent = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+        const fileContent = await FileSystem.readAsStringAsync(uri, {
+            encoding: FileSystem.EncodingType.Base64,
+        });
 
-      // Load and parse the zip file
-      const zip = new JSZip();
-      const zipContent = await zip.loadAsync(fileContent, { base64: true });
+        const zip = await JSZip.loadAsync(fileContent, { base64: true });
+        const data: ZipFileData = {};
 
-      const result: ZipFileData = {};
-
-      // Process each file in the zip
-      for (const [filename, file] of Object.entries(zipContent.files)) {
-        if (!file.dir) {
-          const content = await file.async('string');
-          
-          if (filename.includes('joint_positions')) {
-            result.jointPositions = this.parseJointPositions(content);
-          } else if (filename.includes('segment_orientations')) {
-            result.segmentOrientations = this.parseSegmentOrientations(content);
-          } else if (filename.includes('gait_parameters')) {
-            result.gaitParameters = this.parseGaitParameters(content);
-          } else if (filename.includes('raw_data')) {
-            result.raw = this.parseRawData(content);
-          }
+        if (zip.files['joint_positions.csv']) {
+            const csvData = await zip.files['joint_positions.csv'].async('text');
+            data.jointPositions = Papa.parse<JointPositions>(csvData, { header: true, dynamicTyping: true }).data;
         }
-      }
+        if (zip.files['segment_orientations.csv']) {
+            const csvData = await zip.files['segment_orientations.csv'].async('text');
+            data.segmentOrientations = Papa.parse<SegmentOrientations>(csvData, { header: true, dynamicTyping: true }).data;
+        }
+        if (zip.files['gait_parameters.csv']) {
+            const csvData = await zip.files['gait_parameters.csv'].async('text');
+            data.gaitParameters = Papa.parse<GaitParameters>(csvData, { header: true, dynamicTyping: true }).data;
+        }
 
-      return result;
+        return data;
     } catch (error) {
-      console.error('Error processing zip file:', error);
-      throw error;
+        console.error('Error processing ZIP file:', error);
+        throw error;
     }
-  }
+};
 
-  private parseJointPositions(csvContent: string): JointPositions[] {
-    const parsed = Papa.parse(csvContent, { header: true });
-    return parsed.data.map((row: any) => ({
-      ankle: {
-        x: parseFloat(row.ankle_x),
-        y: parseFloat(row.ankle_y),
-        z: parseFloat(row.ankle_z),
-      },
-      knee: {
-        x: parseFloat(row.knee_x),
-        y: parseFloat(row.knee_y),
-        z: parseFloat(row.knee_z),
-      },
-      hip: {
-        x: parseFloat(row.hip_x),
-        y: parseFloat(row.hip_y),
-        z: parseFloat(row.hip_z),
-      },
-      timestamp: row.timestamp,
-    }));
-  }
+const parseSensorFile = (fileContent: string): any[] => {
+    const lines = fileContent.replace(/\r\n/g, '\n').split('\n');
+    
+    // Find the start of actual data (after metadata)
+    let dataStartIndex = 0;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        // Look for a line that starts with a number or contains typical header columns
+        if (/^\d/.test(line) || /PacketCounter|SampleTimeFine|Quat_|Euler_/.test(line)) {
+            dataStartIndex = i;
+            break;
+        }
+    }
 
-  private parseSegmentOrientations(csvContent: string): SegmentOrientations[] {
-    const parsed = Papa.parse(csvContent, { header: true });
-    return parsed.data.map((row: any) => ({
-      foot: this.parseQuaternion(row, 'foot'),
-      tibia: this.parseQuaternion(row, 'tibia'),
-      femur: this.parseQuaternion(row, 'femur'),
-      timestamp: row.timestamp,
-    }));
-  }
+    // Extract and clean the header line
+    const headerLine = lines[dataStartIndex].trim()
+        .replace(/\s+/g, ',')  // Replace multiple spaces with commas
+        .replace(/[,]+/g, ',') // Replace multiple commas with single comma
+        .replace(/^,|,$/g, ''); // Remove leading/trailing commas
 
-  private parseQuaternion(row: any, prefix: string): { qx: number; qy: number; qz: number; qw: number } {
-    // Handle both Euler angles and quaternion inputs
-    if (row[`${prefix}_qw`] !== undefined) {
-      // Direct quaternion data
-      return {
-        qx: parseFloat(row[`${prefix}_qx`]),
-        qy: parseFloat(row[`${prefix}_qy`]),
-        qz: parseFloat(row[`${prefix}_qz`]),
-        qw: parseFloat(row[`${prefix}_qw`]),
-      };
+    const headers = headerLine.split(',').map(h => h.trim());
+    
+    const dataRows = [];
+    // Process each data line
+    for (let i = dataStartIndex + 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line || line.startsWith('//') || line.startsWith('#')) {
+            continue;
+        }
+
+        // Clean and split the data line
+        const values = line
+            .replace(/\s+/g, ',')  // Replace multiple spaces with commas
+            .replace(/[,]+/g, ',') // Replace multiple commas with single comma
+            .replace(/^,|,$/g, '') // Remove leading/trailing commas
+            .split(',')
+            .map(v => v.trim());
+
+        if (values.length >= 4) {  // Ensure we have at least some valid data
+            const rowData: { [key: string]: any } = {};
+            headers.forEach((header, index) => {
+                if (index < values.length) {
+                    const value = parseFloat(values[index]);
+                    rowData[header] = isNaN(value) ? values[index] : value;
+                }
+            });
+            dataRows.push(rowData);
+        }
+    }
+
+    if (dataRows.length === 0) {
+        console.warn("No valid data rows found in the file");
+        console.warn("Headers found:", headers);
     } else {
-      // Convert from Euler angles
-      const euler = new Euler(
-        parseFloat(row[`${prefix}_x`]) * Math.PI / 180,
-        parseFloat(row[`${prefix}_y`]) * Math.PI / 180,
-        parseFloat(row[`${prefix}_z`]) * Math.PI / 180,
-        'XYZ'
-      );
-      const quaternion = new Quaternion().setFromEuler(euler);
-      return {
-        qx: quaternion.x,
-        qy: quaternion.y,
-        qz: quaternion.z,
-        qw: quaternion.w,
-      };
+        console.log(`Successfully parsed ${dataRows.length} rows with ${headers.length} columns`);
+        console.log("Sample row:", dataRows[0]);
     }
-  }
 
-  private parseGaitParameters(csvContent: string): GaitParameters[] {
-    const parsed = Papa.parse(csvContent, { header: true });
-    return parsed.data.map((row: any) => ({
-      stepLength: parseFloat(row.step_length),
-      cadence: parseFloat(row.cadence),
-      timestamp: row.timestamp,
-    }));
-  }
+    return dataRows;
+};
 
-  private parseRawData(csvContent: string): { accelerometer: any[]; gyroscope: any[] } {
-    const parsed = Papa.parse(csvContent, { header: true });
+export const analyzeMovementData = async (uri: string, exerciseType: 'Squat' | 'Leg Knee Extension') => {
+    try {
+        const zipData = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+        const zip = await JSZip.loadAsync(zipData, { base64: true });
+        
+        const sensorData: { [key: string]: any[] } = {};
+        for (const fileName in zip.files) {
+            if (!zip.files[fileName].dir && (fileName.endsWith('.txt') || fileName.endsWith('.csv'))) {
+                console.log(`Processing file: ${fileName}`);
+                const fileContent = await zip.files[fileName].async('text');
+                const parsed = parseSensorFile(fileContent);
+                if (parsed.length > 0) {
+                    sensorData[fileName] = parsed;
+                    console.log(`Successfully processed ${fileName} with ${parsed.length} rows`);
+                }
+            }
+        }
+
+        const firstFileKey = Object.keys(sensorData)[0];
+        if (!firstFileKey || sensorData[firstFileKey].length === 0) {
+            throw new Error("No valid sensor data found in the ZIP file.");
+        }
+
+        let analysis;
+        if (exerciseType === 'Squat') {
+            analysis = calculateSquatMetrics(sensorData);
+        } else {
+            analysis = calculateLegKneeExtensionMetrics(sensorData);
+        }
+
+        return {
+            exerciseType,
+            ...analysis,
+        };
+    } catch (error) {
+        console.error('Error in analyzeMovementData:', error);
+        throw error;
+    }
+};
+
+const findPeaks = (data: number[], threshold: number, distance: number) => {
+    const peaks: number[] = [];
+    for (let i = 1; i < data.length - 1; i++) {
+        const isPeak = data[i] > threshold && data[i] > data[i - 1] && data[i] > data[i + 1];
+        if (isPeak) {
+            if (peaks.length === 0 || i - peaks[peaks.length - 1] > distance) {
+                peaks.push(i);
+            }
+        }
+    }
+    return peaks.length;
+};
+
+const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }) => {
+    const sensorKeys = Object.keys(sensorData).sort();
+    if (sensorKeys.length < 2) {
+        throw new Error("At least two sensor files are required for angle calculation.");
+    }
+
+    const thighData = sensorData[sensorKeys[0]];
+    const shinData = sensorData[sensorKeys[1]];
+
+    const jointAngles: number[] = [];
+    const numFrames = Math.min(thighData.length, shinData.length);
+
+    for (let i = 0; i < numFrames; i++) {
+        const thighRow = thighData[i];
+        const shinRow = shinData[i];
+
+        const q1 = thighRow.Quat_W != null ? new THREE.Quaternion(thighRow.Quat_X, thighRow.Quat_Y, thighRow.Quat_Z, thighRow.Quat_W) : eulerToQuaternion(thighRow.Euler_X, thighRow.Euler_Y, thighRow.Euler_Z);
+        const q2 = shinRow.Quat_W != null ? new THREE.Quaternion(shinRow.Quat_X, shinRow.Quat_Y, shinRow.Quat_Z, shinRow.Quat_W) : eulerToQuaternion(shinRow.Euler_X, shinRow.Euler_Y, shinRow.Euler_Z);
+
+        if (q1 && q2) {
+            const angle = calculateJointAngle(q1, q2);
+            jointAngles.push(angle);
+        }
+    }
+
+    if (jointAngles.length === 0) {
+        return {
+            jointAngles: [],
+            metrics: {
+                repetitionCount: 0,
+                maxFlexionAngle: 0,
+                maxExtensionAngle: 0,
+            },
+        };
+    }
+
+    const repetitionCount = findPeaks(jointAngles, 90, 20);
+    const maxFlexionAngle = Math.max(...jointAngles);
+    const maxExtensionAngle = Math.min(...jointAngles);
+
     return {
-      accelerometer: parsed.data.map((row: any) => ({
-        x: parseFloat(row.accel_x),
-        y: parseFloat(row.accel_y),
-        z: parseFloat(row.accel_z),
-        timestamp: row.timestamp,
-      })),
-      gyroscope: parsed.data.map((row: any) => ({
-        x: parseFloat(row.gyro_x),
-        y: parseFloat(row.gyro_y),
-        z: parseFloat(row.gyro_z),
-        timestamp: row.timestamp,
-      })),
+        jointAngles,
+        metrics: {
+            repetitionCount,
+            maxFlexionAngle,
+            maxExtensionAngle,
+        },
     };
-  }
+};
 
-  public calculateRelativeRotation(q1: Quaternion, q2: Quaternion): Quaternion {
-    // Calculate the relative rotation from q1 to q2
-    return q2.clone().multiply(q1.clone().invert());
-  }
+const calculateSquatMetrics = (sensorData: { [key: string]: any[] }) => {
+    return calculateMetricsForExercise(sensorData);
+};
 
-  public interpolateQuaternions(q1: Quaternion, q2: Quaternion, t: number): Quaternion {
-    // Spherical linear interpolation between quaternions
-    return q1.clone().slerp(q2, t);
-  }
+const calculateLegKneeExtensionMetrics = (sensorData: { [key: string]: any[] }) => {
+    return calculateMetricsForExercise(sensorData);
+};
 
-  public calculateJointAngle(q1: SegmentOrientation, q2: SegmentOrientation): number {
-    // Convert SegmentOrientation to THREE.Quaternion
-    const quaternion1 = new Quaternion(q1.qx, q1.qy, q1.qz, q1.qw);
-    const quaternion2 = new Quaternion(q2.qx, q2.qy, q2.qz, q2.qw);
+const movementService = {
+    eulerToQuaternion,
+    calculateJointAngle,
+    processZipFile,
+    analyzeMovementData,
+};
 
-    // Calculate relative rotation between segments
-    const relativeRotation = quaternion1.clone().multiply(quaternion2.clone().invert());
-
-    // Convert to Euler angles
-    const euler = new Euler().setFromQuaternion(relativeRotation);
-
-    // Return the angle in degrees (using the largest component)
-    return Math.abs(Math.max(
-        MathUtils.radToDeg(euler.x),
-        MathUtils.radToDeg(euler.y),
-        MathUtils.radToDeg(euler.z)
-    ));
-  }
-}
-
-export default MovementService.getInstance(); 
+export default movementService; 

@@ -171,7 +171,7 @@ const PatientHomeScreen = ({ navigation }: any) => {
                                 {(healthData.distance / 1000).toFixed(1)}
                             </Text>
                             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>KM</Text>
-                        </View>
+        </View>
                     </View>
                 )}
 

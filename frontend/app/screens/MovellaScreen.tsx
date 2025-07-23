@@ -82,7 +82,6 @@ const MovellaScreen = () => {
                     case 'shin':
                         newOrientations.rightShin = orientation;
                         break;
-                    // Add more mappings as needed
                 }
             }
         });
@@ -100,7 +99,7 @@ const MovellaScreen = () => {
                     updateOrientations(next);
                     return next;
                 });
-            }, 50); // 20fps
+            }, 50); 
         }
         
         return () => {
@@ -132,7 +131,6 @@ const MovellaScreen = () => {
             console.error('Error picking document:', error);
             Alert.alert('Error', 'Failed to pick the document.');
         } finally {
-            // setIsLoading(false); // This line was removed from the new_code, so it's removed here.
         }
     };
 
@@ -149,7 +147,6 @@ const MovellaScreen = () => {
                 if (zip.files[a].name.endsWith('.csv') || zip.files[a].name.endsWith('.txt')) {
                     let csvData = await zip.files[a].async('text');
                     
-                    // Find header row and slice the data from there to ignore metadata
                     const headerIndex = csvData.indexOf('PacketCounter');
                     if (headerIndex !== -1) {
                         csvData = csvData.substring(headerIndex);
@@ -177,11 +174,12 @@ const MovellaScreen = () => {
     const processData = (data: Record<string, SensorData[]>) => {
         const sortedFileKeys = Object.keys(data).sort();
         if (sortedFileKeys.length >= 2) {
+            const so1 = convertToSegmentOrientation(data[sortedFileKeys[0]][0]);
+            const so2 = convertToSegmentOrientation(data[sortedFileKeys[1]][0]);
             const angles = movementService.calculateJointAngle(
-                convertToSegmentOrientation(data[sortedFileKeys[0]][0]),
-                convertToSegmentOrientation(data[sortedFileKeys[1]][0])
+                new THREE.Quaternion(so1.qx, so1.qy, so1.qz, so1.qw),
+                new THREE.Quaternion(so2.qx, so2.qy, so2.qz, so2.qw)
             );
-            // Process angles as needed
         } else {
             Alert.alert('Not Enough Data', 'At least two sensor data files are needed to calculate joint angles.');
         }

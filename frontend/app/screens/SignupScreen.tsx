@@ -37,7 +37,7 @@ const SignupScreen = ({ navigation }: any) => {
         style={styles.container}
       >
         <View style={styles.header}>
-          <Image source={require('../../assets/eucip.png')} style={styles.logo} />
+          <Image source={require('../../assets/logo.png')} style={styles.logo} />
           <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>Welcome to</Text>
           <Text style={[styles.title, { color: colors.text }]}>TwinRehab</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -113,10 +113,6 @@ const SignupScreen = ({ navigation }: any) => {
               Already have an account? <Text style={{ fontWeight: '600' }}>Sign In</Text>
             </Text>
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.footer}>
-          <Image source={require('../../assets/eucip.png')} style={styles.footerImage} />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

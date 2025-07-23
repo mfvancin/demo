@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ChartData } from 'react-native-chart-kit/dist/HelperTypes';
-import { RecoveryProcess, Patient, Medication, PatientDetails, MovementData } from '../types';
+import { RecoveryProcess, Patient, Medication, PatientDetails } from '../types';
 import { useTheme } from '../theme/ThemeContext';
-import ChartCard from '@components/ChartCard';
 import AssignmentModal from '@components/AssignmentModal';
 import PatientDetailsCard from '@components/PatientDetailsCard';
 import MovementDataDisplay from '@components/MovementDataDisplay';
@@ -13,103 +11,14 @@ import { useHealth } from '@context/HealthContext';
 import { usePatients } from '@context/PatientContext';
 import * as DocumentPicker from 'expo-document-picker';
 import movementService from '@services/movementService';
-
-const MotionVisualizerSection = ({ movementData, colors }: { movementData: MovementData, colors: any }) => {
-  const [currentFrame, setCurrentFrame] = useState(0);
-  const maxFrames = movementData.segmentOrientations?.length || 0;
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentFrame((prev) => (prev + 1) % maxFrames);
-    }, 50); 
-    return () => clearInterval(interval);
-  }, [maxFrames]);
-
-  const currentOrientation = movementData.segmentOrientations?.[currentFrame];
-
-  return (
-    <View style={[styles.section, { backgroundColor: colors.card }]}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Motion Visualization</Text>
-      <View style={styles.avatarContainer}>
-        <Avatar
-          orientations={{
-            rightThigh: currentOrientation?.femur,
-            rightShin: currentOrientation?.tibia,
-            rightFoot: currentOrientation?.foot,
-          }}
-        />
-      </View>
-    </View>
-  );
-};
-
-const MotionMetricsSection = ({ movementData, colors }: { movementData: MovementData, colors: any }) => {
-  const calculateRangeOfMotion = () => {
-    if (!movementData.segmentOrientations?.length) {
-      return null;
-    }
-
-    let maxKneeFlexion = 0;
-    let maxKneeExtension = 180;
-    let maxAnkleFlexion = 0;
-    let maxAnkleDorsiflexion = 0;
-
-    movementData.segmentOrientations.forEach(orientation => {
-      const kneeAngle = movementService.calculateJointAngle(orientation.femur, orientation.tibia);
-      maxKneeFlexion = Math.max(maxKneeFlexion, kneeAngle);
-      maxKneeExtension = Math.min(maxKneeExtension, kneeAngle);
-
-      const ankleAngle = movementService.calculateJointAngle(orientation.tibia, orientation.foot);
-      if (ankleAngle > 90) {
-        maxAnkleFlexion = Math.max(maxAnkleFlexion, ankleAngle - 90);
-      } else {
-        maxAnkleDorsiflexion = Math.max(maxAnkleDorsiflexion, 90 - ankleAngle);
-      }
-    });
-
-    return {
-      kneeFlexion: maxKneeFlexion.toFixed(1),
-      kneeExtension: maxKneeExtension.toFixed(1),
-      ankleFlexion: maxAnkleFlexion.toFixed(1),
-      ankleDorsiflexion: maxAnkleDorsiflexion.toFixed(1),
-    };
-  };
-
-  const metrics = calculateRangeOfMotion();
-
-  return (
-    <View style={[styles.section, { backgroundColor: colors.card }]}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Range of Motion</Text>
-      {metrics ? (
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricItem}>
-            <Text style={[styles.rangeMetricValue, { color: colors.text }]}>{metrics.kneeFlexion}°</Text>
-            <Text style={[styles.rangeMetricLabel, { color: colors.textSecondary }]}>Max Knee Flexion</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <Text style={[styles.rangeMetricValue, { color: colors.text }]}>{metrics.kneeExtension}°</Text>
-            <Text style={[styles.rangeMetricLabel, { color: colors.textSecondary }]}>Max Knee Extension</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <Text style={[styles.rangeMetricValue, { color: colors.text }]}>{metrics.ankleFlexion}°</Text>
-            <Text style={[styles.rangeMetricLabel, { color: colors.textSecondary }]}>Max Ankle Flexion</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <Text style={[styles.rangeMetricValue, { color: colors.text }]}>{metrics.ankleDorsiflexion}°</Text>
-            <Text style={[styles.rangeMetricLabel, { color: colors.textSecondary }]}>Max Dorsiflexion</Text>
-          </View>
-        </View>
-      ) : (
-        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>No motion data available</Text>
-      )}
-    </View>
-  );
-};
+import * as patientService from '@services/patientService';
+import AssignedExercisesCard from '@components/AssignedExercisesCard';
+import MovementAnalysisCard from '@components/MovementAnalysisCard';
 
 const PatientDetailScreen = ({ route, navigation }: any) => {
     const { colors } = useTheme();
     const { patientId, role, completedExerciseId } = route.params;
-    const { patients } = usePatients();
+    const { patients, updatePatient } = usePatients();
     const patientData = patients[patientId];
     const { healthData } = useHealth();
 
@@ -118,7 +27,7 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
     const [modalVisible, setModalVisible] = useState(false);
     const [assignmentType, setAssignmentType] = useState<'exercise' | 'medication' | null>(null);
     const [selectedExercise, setSelectedExercise] = useState<RecoveryProcess | null>(null);
-    const [movementData, setMovementData] = useState(patientData.movementData?.[0]);
+    const [movementData, setMovementData] = useState(patientData?.movementData?.[0]);
 
     useEffect(() => {
         if (patientData) {
@@ -175,9 +84,15 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
         }
     };
 
-    const handleUpdateDetails = (details: Partial<PatientDetails>) => {
-        // In a real app, this would update the backend
-        console.log('Updating patient details:', details);
+    const handleUpdateDetails = async (details: Partial<PatientDetails>) => {
+        if (!patientData) return;
+        try {
+            const updatedPatient = await patientService.updatePatientDetails(patientData.id, details);
+            updatePatient(updatedPatient);
+        } catch (error) {
+            console.error('Failed to update details:', error);
+            Alert.alert('Error', 'Could not update patient details.');
+        }
     };
 
     const handleUploadMovementData = async () => {
@@ -251,27 +166,13 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
             >
                 <PatientDetailsCard
                     details={patientData.details}
-                    feedback={patientData.feedback}
                     onUpdateDetails={handleUpdateDetails}
                     isEditable={role === 'doctor'}
                 />
 
-                <View style={[styles.section, { backgroundColor: colors.card }]}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Assigned Exercises</Text>
-                        {role === 'doctor' && (
-                            <TouchableOpacity onPress={() => openModal('exercise')}>
-                                <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                    <FlatList
-                        data={exercises}
-                        renderItem={renderExerciseItem}
-                        keyExtractor={(item) => item.id}
-                        scrollEnabled={false}
-                    />
-                </View>
+                <AssignedExercisesCard patient={patientData} isEditable={role === 'doctor'} />
+                
+                <MovementAnalysisCard patientId={patientData.id} />
 
                 {selectedExercise && role === 'doctor' && (
                     <View style={[styles.section, { backgroundColor: colors.card }]}>
@@ -283,8 +184,6 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
                         </View>
                         {movementData ? (
                             <>
-                                <MotionVisualizerSection movementData={movementData} colors={colors} />
-                                <MotionMetricsSection movementData={movementData} colors={colors} />
                                 <MovementDataDisplay
                                     jointPositions={movementData.jointPositions}
                                     segmentOrientations={movementData.segmentOrientations}
@@ -389,11 +288,6 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 17,
         fontWeight: '500',
-        marginBottom: 20,
-    },
-    card: {
-        borderRadius: 12,
-        padding: 16,
         marginBottom: 20,
     },
     progressContainer: {
@@ -508,33 +402,6 @@ const styles = StyleSheet.create({
     },
     healthMetricLabel: {  // Renamed from metricLabel
         fontSize: 14,
-    },
-    avatarContainer: {
-        height: 300,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    metricsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        padding: 16,
-    },
-    metricItem: {
-        width: '48%',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    rangeMetricValue: {  
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 4,
-        textAlign: 'center',
-    },
-    rangeMetricLabel: {  
-        fontSize: 14,
-        textAlign: 'center',
-        color: '#666',
     },
 });
 

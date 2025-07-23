@@ -15,9 +15,19 @@ const eulerToQuaternion = (x: number, y: number, z: number) => {
 };
 
 export const calculateJointAngle = (q1: THREE.Quaternion, q2: THREE.Quaternion) => {
+    // Get the relative rotation between the two segments
     const qRelative = q1.clone().invert().multiply(q2);
-    const angle = 2 * Math.atan2(new THREE.Vector3(qRelative.x, qRelative.y, qRelative.z).length(), qRelative.w);
-    return THREE.MathUtils.radToDeg(angle);
+    
+    // Convert to Euler angles to get the primary rotation angle (in radians)
+    const euler = new THREE.Euler().setFromQuaternion(qRelative, 'XYZ');
+    
+    // Convert to degrees and adjust to anatomical angle
+    // In anatomical terms, full extension is 180° and full flexion is around 90°
+    const rawAngle = THREE.MathUtils.radToDeg(euler.x);
+    
+    // Map the raw angle to anatomical angle
+    // When segments are aligned (0° raw angle), it should be 180° anatomical angle
+    return 180 - rawAngle;
 };
 
 export const processZipFile = async (uri: string): Promise<ZipFileData> => {
@@ -153,8 +163,9 @@ export const analyzeMovementData = async (uri: string, exerciseType: 'Squat' | '
 const findPeaks = (data: number[], threshold: number, distance: number) => {
     const peaks: number[] = [];
     for (let i = 1; i < data.length - 1; i++) {
-        const isPeak = data[i] > threshold && data[i] > data[i - 1] && data[i] > data[i + 1];
-        if (isPeak) {
+        // For squats, we're looking for valleys (flexion points) rather than peaks
+        const isValley = data[i] < threshold && data[i] < data[i - 1] && data[i] < data[i + 1];
+        if (isValley) {
             if (peaks.length === 0 || i - peaks[peaks.length - 1] > distance) {
                 peaks.push(i);
             }
@@ -179,8 +190,13 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }) => {
         const thighRow = thighData[i];
         const shinRow = shinData[i];
 
-        const q1 = thighRow.Quat_W != null ? new THREE.Quaternion(thighRow.Quat_X, thighRow.Quat_Y, thighRow.Quat_Z, thighRow.Quat_W) : eulerToQuaternion(thighRow.Euler_X, thighRow.Euler_Y, thighRow.Euler_Z);
-        const q2 = shinRow.Quat_W != null ? new THREE.Quaternion(shinRow.Quat_X, shinRow.Quat_Y, shinRow.Quat_Z, shinRow.Quat_W) : eulerToQuaternion(shinRow.Euler_X, shinRow.Euler_Y, shinRow.Euler_Z);
+        const q1 = thighRow.Quat_W != null ? 
+            new THREE.Quaternion(thighRow.Quat_X, thighRow.Quat_Y, thighRow.Quat_Z, thighRow.Quat_W) : 
+            eulerToQuaternion(thighRow.Euler_X, thighRow.Euler_Y, thighRow.Euler_Z);
+        
+        const q2 = shinRow.Quat_W != null ? 
+            new THREE.Quaternion(shinRow.Quat_X, shinRow.Quat_Y, shinRow.Quat_Z, shinRow.Quat_W) : 
+            eulerToQuaternion(shinRow.Euler_X, shinRow.Euler_Y, shinRow.Euler_Z);
 
         if (q1 && q2) {
             const angle = calculateJointAngle(q1, q2);
@@ -199,9 +215,13 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }) => {
         };
     }
 
-    const repetitionCount = findPeaks(jointAngles, 90, 20);
-    const maxFlexionAngle = Math.max(...jointAngles);
-    const maxExtensionAngle = Math.min(...jointAngles);
+    // For squats:
+    // - maxFlexionAngle should be the minimum angle (around 90°)
+    // - maxExtensionAngle should be the maximum angle (around 180°)
+    // - repetitionCount is counted when angle goes below 120° (significant flexion)
+    const maxExtensionAngle = Math.max(...jointAngles);
+    const maxFlexionAngle = Math.min(...jointAngles);
+    const repetitionCount = findPeaks(jointAngles, 120, 20); // Count reps when knee flexes past 120°
 
     return {
         jointAngles,

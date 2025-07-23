@@ -29,7 +29,6 @@ const MovementAnalysisCard: React.FC<MovementAnalysisCardProps> = ({ patientId }
                 setIsLoading(true);
                 const analysis = await movementService.analyzeMovementData(result.assets[0].uri, selectedExercise as any);
                 setAnalysisResult(analysis);
-                Alert.alert('Analysis Complete', `Detected Exercise: ${analysis.exerciseType}`);
             }
         } catch (error) {
             console.error('Failed to analyze movement data:', error);

@@ -11,24 +11,7 @@ const api = axios.create({
   timeout: 10000, // 10 seconds timeout
 });
 
-// Add response interceptor for better error handling
-api.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response) {
-      // Server responded with error status
-      console.error('API Error:', error.response.data);
-      throw error.response.data;
-    } else if (error.request) {
-      // Request was made but no response
-      console.error('Network Error:', error.request);
-      throw new Error('Network error - please check your connection');
-    } else {
-      // Something else happened
-      console.error('Error:', error.message);
-      throw error;
-    }
-  }
-);
+// We will move the interceptors to AuthContext to avoid race conditions
+// and to handle token refresh logic in a centralized place.
 
 export default api; 

@@ -3,32 +3,90 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt as PyJWT
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 app = Flask(__name__)
 CORS(app)
 app.config['SECRET_KEY'] = 'your-secret-key'  # In production, use a secure secret key
 
-# Database simulation (replace with real database in production)
-users = {}
-patients = {}
-doctors_patients = {}
+# --- Pre-populated mock data ---
+hashed_password_doctor = generate_password_hash('password')
+
+users = {
+    'doc1': {
+        "id": "doc1",
+        "email": "doctor@demo.com",
+        "password": hashed_password_doctor,
+        "role": "doctor",
+        "name": "Dr. Smith"
+    },
+    '1': { "id": "1", "email": "john.doe@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "John Doe" },
+    '2': { "id": "2", "email": "jane.smith@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "Jane Smith" },
+    '3': { "id": "3", "email": "robert.johnson@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "Robert Johnson" },
+    '4': { "id": "4", "email": "emily.williams@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "Emily Williams" },
+    '5': { "id": "5", "email": "michael.brown@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "Michael Brown" }
+}
+
+default_patient_details = {
+    "age": 0, "sex": "N/A", "height": 0, "weight": 0, "bmi": 0,
+    "clinicalInfo": "No information provided."
+}
+
+patients = {
+    '1': { 
+        "id": '1', 
+        "name": 'John Doe', 
+        "recovery_process": [],
+        "details": {
+            "age": 65, "sex": "Male", "height": 1.8, "weight": 85, "bmi": 26.2,
+            "clinicalInfo": "Post-op recovery from total knee replacement. Reports mild pain and swelling."
+        }
+    },
+    '2': { 
+        "id": '2', 
+        "name": 'Jane Smith', 
+        "recovery_process": [],
+        "details": {
+            "age": 42, "sex": "Female", "height": 1.65, "weight": 60, "bmi": 22.0,
+            "clinicalInfo": "ACL reconstruction on the left knee. Currently non-weight bearing."
+        }
+    },
+    '3': { 
+        "id": '3', 
+        "name": 'Robert Johnson', 
+        "recovery_process": [],
+        "details": {
+            "age": 58, "sex": "Male", "height": 1.75, "weight": 95, "bmi": 31.0,
+            "clinicalInfo": "Chronic osteoarthritis in both knees. Focus on pain management and mobility."
+        }
+    },
+    '4': { "id": '4', "name": 'Emily Williams', "recovery_process": [], "details": default_patient_details },
+    '5': { "id": '5', "name": 'Michael Brown', "recovery_process": [], "details": default_patient_details }
+}
+
+doctors_patients = {
+    'doc1': ['1', '2', '3'] # Assign all detailed patients to Dr. Smith
+}
 
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
+        token = None
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization'].split(' ')[1]
+
         if not token:
             return jsonify({'error': 'Token is missing'}), 401
+        
         try:
-            token = token.split(' ')[1]  # Remove 'Bearer ' prefix
             data = PyJWT.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
             current_user = users.get(data['user_id'])
             if not current_user:
                 return jsonify({'error': 'Invalid token'}), 401
-        except:
-            return jsonify({'error': 'Invalid token'}), 401
+        except Exception as e:
+            return jsonify({'error': 'Invalid token', 'details': str(e)}), 401
+            
         return f(current_user, *args, **kwargs)
     return decorated
 
@@ -59,7 +117,7 @@ def login():
     # Generate token
     token = PyJWT.encode({
         'user_id': user['id'],
-        'exp': datetime.utcnow() + timedelta(days=1)
+        'exp': datetime.now(timezone.utc) + timedelta(days=1)
     }, app.config['SECRET_KEY'])
 
     return jsonify({
@@ -103,13 +161,16 @@ def signup():
         patients[user_id] = {
             "id": user_id,
             "name": name,
-            "recovery_process": []
+            "recovery_process": [],
+            "details": default_patient_details
         }
+    elif role == 'doctor':
+        doctors_patients[user_id] = []
 
     # Generate token
     token = PyJWT.encode({
         'user_id': user_id,
-        'exp': datetime.utcnow() + timedelta(days=1)
+        'exp': datetime.now(timezone.utc) + timedelta(days=1)
     }, app.config['SECRET_KEY'])
 
     return jsonify({
@@ -141,9 +202,24 @@ def get_doctor_patients(current_user, doctor_id):
     if current_user['role'] != 'doctor' or current_user['id'] != doctor_id:
         return jsonify({"error": "Unauthorized"}), 403
 
-    patient_ids = doctors_patients.get(doctor_id, [])
-    doctor_patients = [patients[p_id] for p_id in patient_ids if p_id in patients]
-    return jsonify(doctor_patients)
+    # Per user request, display all mock patients on the clinical dashboard
+    return jsonify(list(patients.values()))
+
+@app.route('/patients/unassigned', methods=['GET'])
+@token_required
+def get_unassigned_patients(current_user):
+    if current_user['role'] != 'doctor':
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    assigned_patient_ids = {patient_id for patient_list in doctors_patients.values() for patient_id in patient_list}
+    
+    # New patients who sign up will appear here until assigned
+    unassigned_patients = [
+        patient for patient_id, patient in patients.items() 
+        if patient_id not in assigned_patient_ids
+    ]
+    
+    return jsonify(unassigned_patients)
 
 @app.route('/patients/<patient_id>/assign-doctor', methods=['POST'])
 @token_required

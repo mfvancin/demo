@@ -1,13 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { usePatients } from '../context/PatientContext';
 import { Ionicons } from '@expo/vector-icons';
-import type { RecoveryProcess, Patient } from '../types';
-import ActivityRings from '@components/ActivityRings';
-import ChartCard from '@components/ChartCard';
-import Avatar, { AvatarProps } from '@components/Avatar';
+import type { Patient } from '../types';
+import PatientCard from '@components/PatientCard';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface StatCardProps {
     icon: keyof typeof Ionicons.glyphMap;
@@ -31,96 +30,17 @@ const StatCard: React.FC<StatCardProps> = ({ icon, value, label, color }) => {
     );
 };
 
-const PatientCard = ({ item, navigation }: { item: Patient; navigation: any }) => {
-    const { colors } = useTheme();
-    const completedExercises = item.recovery_process.filter(ex => ex.completed).length;
-    const totalExercises = item.recovery_process.length;
-    const progress = totalExercises > 0 ? (completedExercises / totalExercises) * 100 : 0;
-
-    // Get the latest movement data
-    const latestMovement = item.movementData?.[item.movementData.length - 1];
-    const latestOrientation = latestMovement?.segmentOrientations?.[0];
-
-    return (
-        <TouchableOpacity 
-            style={[styles.patientCard, { backgroundColor: colors.card }]} 
-            onPress={() => navigation.navigate('PatientDetail', { patientId: item.id, role: 'doctor' })}
-        >
-            <View style={styles.patientHeader}>
-                <View style={styles.patientInfo}>
-                    <View style={[styles.avatar, { backgroundColor: colors.purple[100] }]}>
-                        <Text style={[styles.avatarText, { color: colors.purple[600] }]}>
-                            {item.name.split(' ').map(n => n[0]).join('')}
-                        </Text>
-                    </View>
-                    <View>
-                        <Text style={[styles.patientName, { color: colors.text }]}>{item.name}</Text>
-                        <Text style={[styles.patientSubtext, { color: colors.textSecondary }]}>
-                            {`${completedExercises}/${totalExercises} exercises completed`}
-                        </Text>
-                    </View>
-                </View>
-                <View style={[styles.progressBadge, { backgroundColor: colors.purple[50] }]}>
-                    <Text style={[styles.progressText, { color: colors.purple[500] }]}>
-                        {`${Math.round(progress)}%`}
-                    </Text>
-                </View>
-            </View>
-
-            <View style={[styles.progressBar, { backgroundColor: colors.gray[200] }]}>
-                <View 
-                    style={[
-                        styles.progressFill, 
-                        { 
-                            backgroundColor: colors.purple[500],
-                            width: `${progress}%` 
-                        }
-                    ]} 
-                />
-            </View>
-
-            {latestMovement && (
-                <View style={styles.dataPreview}>
-                    <View style={styles.avatarPreview}>
-                        <Avatar
-                            orientations={{
-                                rightThigh: latestOrientation?.femur,
-                                rightShin: latestOrientation?.tibia,
-                                leftThigh: latestOrientation?.femur,
-                                leftShin: latestOrientation?.tibia,
-                            }}
-                            size={120}
-                        />
-                    </View>
-                    <View style={styles.metricsPreview}>
-                        <View style={styles.metricRow}>
-                            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Latest Session</Text>
-                            <Text style={[styles.metricValue, { color: colors.text }]}>
-                                {new Date(latestMovement.timestamp).toLocaleDateString()}
-                            </Text>
-                        </View>
-                        <View style={styles.metricRow}>
-                            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Knee ROM</Text>
-                            <Text style={[styles.metricValue, { color: colors.text }]}>
-                                {`${Math.round(latestMovement.gaitParameters?.[0]?.stepLength || 0)}°`}
-                            </Text>
-                        </View>
-                        <View style={styles.metricRow}>
-                            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Ankle ROM</Text>
-                            <Text style={[styles.metricValue, { color: colors.text }]}>
-                                {`${Math.round(latestMovement.gaitParameters?.[0]?.cadence || 0)}°`}
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-            )}
-        </TouchableOpacity>
-    );
-};
-
 const DoctorHomeScreen = ({ navigation }: any) => {
     const { colors } = useTheme();
-    const { patients } = usePatients();
+    const { user } = useAuth();
+    const { patients, fetchPatients, loading } = usePatients();
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchPatients();
+        }, [fetchPatients])
+    );
+    
     const patientList = Object.values(patients);
 
     const totalPatients = patientList.length;
@@ -132,70 +52,84 @@ const DoctorHomeScreen = ({ navigation }: any) => {
         return acc + (total > 0 ? (completed / total) * 100 : 0);
     }, 0) / (totalPatients || 1);
 
-    return (
-        <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
-            <ScrollView 
-                style={styles.container}
-                contentContainerStyle={styles.contentContainer}
-            >
-                <View style={styles.header}>
-                    <View>
-                        <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>Welcome back,</Text>
-                        <Text style={[styles.title, { color: colors.text }]}>Dr. Smith</Text>
-                    </View>
-                    <TouchableOpacity 
-                        style={[styles.addButton, { backgroundColor: colors.primary }]}
-                        onPress={() => navigation.navigate('CreatePatient')}
-                    >
-                        <Ionicons name="add" size={24} color={colors.white} />
-                    </TouchableOpacity>
+    const renderHeader = () => (
+        <>
+            <View style={styles.header}>
+                <View>
+                    <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>Welcome back,</Text>
+                    <Text style={[styles.title, { color: colors.text }]}>{user?.name}</Text>
                 </View>
+                <TouchableOpacity
+                    style={[styles.addButton, { backgroundColor: colors.primary + '15' }]}
+                    onPress={() => navigation.navigate('CreatePatient')}
+                >
+                    <Ionicons name="person-add-outline" size={24} color={colors.primary} />
+                </TouchableOpacity>
+            </View>
 
-                <View style={styles.statsGrid}>
-                    <StatCard 
-                        icon="people" 
-                        value={totalPatients} 
-                        label="Total Patients"
-                        color={colors.purple[500]}
-                    />
-                    <StatCard 
-                        icon="fitness" 
-                        value={activePatients} 
-                        label="Active Patients"
-                        color={colors.success}
-                    />
-                    <StatCard 
-                        icon="checkmark-circle" 
-                        value={completedPatients} 
-                        label="Completed"
-                        color={colors.info}
-                    />
-                    <StatCard 
-                        icon="trending-up" 
-                        value={`${Math.round(averageProgress)}%`} 
-                        label="Avg. Progress"
-                        color={colors.warning}
-                    />
-                </View>
-
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Patient List</Text>
-                <FlatList
-                    data={patientList}
-                    renderItem={({ item }) => <PatientCard item={item} navigation={navigation} />}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={styles.patientList}
-                    scrollEnabled={false}
+            <View style={styles.statsGrid}>
+                <StatCard 
+                    icon="people" 
+                    value={totalPatients} 
+                    label="Total Patients"
+                    color={colors.purple[500]}
                 />
-            </ScrollView>
-        </View>
+                <StatCard 
+                    icon="fitness" 
+                    value={activePatients} 
+                    label="Active Patients"
+                    color={colors.success}
+                />
+                <StatCard 
+                    icon="checkmark-circle" 
+                    value={completedPatients} 
+                    label="Completed"
+                    color={colors.info}
+                />
+                <StatCard 
+                    icon="trending-up" 
+                    value={`${Math.round(averageProgress)}%`} 
+                    label="Avg. Progress"
+                    color={colors.warning}
+                />
+            </View>
+
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Patient List</Text>
+        </>
+    );
+
+    if (loading && patientList.length === 0) {
+        return (
+            <View style={[styles.safeArea, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+        );
+    }
+
+    return (
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+            <FlatList
+                data={patientList}
+                renderItem={({ item }) => <PatientCard item={item} navigation={navigation} />}
+                keyExtractor={item => item.id}
+                ListHeaderComponent={renderHeader}
+                contentContainerStyle={styles.contentContainer}
+                ListEmptyComponent={
+                    <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
+                        <Ionicons name="people-outline" size={48} color={colors.textSecondary} />
+                        <Text style={[styles.emptyTitle, { color: colors.text }]}>No Patients Found</Text>
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                            There are currently no patients in the system.
+                        </Text>
+                    </View>
+                }
+            />
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
     safeArea: {
-        flex: 1,
-    },
-    container: {
         flex: 1,
     },
     contentContainer: {
@@ -216,11 +150,11 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     addButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         justifyContent: 'center',
+        alignItems: 'center',
     },
     statsGrid: {
         flexDirection: 'row',
@@ -257,88 +191,30 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginBottom: 16,
     },
-    patientList: {
-        gap: 12,
-    },
-    patientCard: {
+    emptyContainer: {
+        alignItems: 'center',
+        padding: 32,
         borderRadius: 12,
-        padding: 16,
-    },
-    patientHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    patientInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    avatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    avatarText: {
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    patientName: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    patientSubtext: {
-        fontSize: 14,
-    },
-    progressBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-    },
-    progressText: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    progressBar: {
-        height: 4,
-        borderRadius: 2,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        height: '100%',
-        borderRadius: 2,
-    },
-    dataPreview: {
-        flexDirection: 'row',
         marginTop: 16,
-        paddingTop: 16,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(0,0,0,0.05)',
     },
-    avatarPreview: {
-        width: 120,
-        height: 120,
-        marginRight: 16,
-    },
-    metricsPreview: {
-        flex: 1,
-        justifyContent: 'center',
-    },
-    metricRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        marginTop: 16,
         marginBottom: 8,
     },
-    metricLabel: {
+    emptyText: {
         fontSize: 14,
+        textAlign: 'center',
+        marginBottom: 24,
     },
-    metricValue: {
-        fontSize: 14,
+    assignButton: {
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 24,
+    },
+    assignButtonText: {
+        fontSize: 16,
         fontWeight: '600',
     },
 });

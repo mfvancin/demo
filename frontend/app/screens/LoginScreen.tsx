@@ -23,8 +23,9 @@ const LoginScreen = ({ navigation }: any) => {
     try {
       await login(email, password, role.toLowerCase() as 'patient' | 'doctor');
       // Navigation will be handled by AppNavigator based on the user state
-    } catch (error) {
-      Alert.alert('Login Failed', 'Invalid email or password.');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'An unexpected error occurred.';
+      Alert.alert('Login Failed', errorMessage);
     } finally {
       setLoading(false);
     }

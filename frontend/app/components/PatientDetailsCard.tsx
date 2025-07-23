@@ -7,8 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 interface PatientDetailsCardProps {
   details: PatientDetails;
   feedback?: PatientFeedback[];
-  onUpdateDetails?: (details: Partial<PatientDetails>) => void;
-  isEditable?: boolean;
+  onUpdateDetails: (details: Partial<PatientDetails>) => void;
+  isEditable: boolean;
 }
 
 const defaultDetails: PatientDetails = {
@@ -20,15 +20,36 @@ const defaultDetails: PatientDetails = {
   clinicalInfo: '',
 };
 
-const PatientDetailsCard: React.FC<PatientDetailsCardProps> = ({
-  details = defaultDetails,
-  feedback,
-  onUpdateDetails,
-  isEditable = false,
-}) => {
-  const { colors } = useTheme();
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedDetails, setEditedDetails] = useState<PatientDetails>(details || defaultDetails);
+const DetailRow: React.FC<{ label: string; value: string | number; isEditable?: boolean; onChange?: (text: string) => void; multiline?: boolean }> = 
+({ label, value, isEditable = false, onChange, multiline = false }) => {
+    const { colors } = useTheme();
+    return (
+    <View style={styles.detailRow}>
+      <Text style={[styles.label, { color: colors.text }]}>{label}:</Text>
+      {isEditable ? (
+        <TextInput
+          style={[styles.input, { color: colors.text, backgroundColor: colors.background }]}
+          value={value.toString()}
+          onChangeText={onChange}
+          keyboardType="default" // Adjust keyboard type as needed
+          multiline={multiline}
+          numberOfLines={multiline ? 4 : 1}
+        />
+      ) : (
+        <Text style={[styles.value, { color: colors.textSecondary }]}>{value}</Text>
+      )}
+    </View>
+  );
+};
+
+const PatientDetailsCard: React.FC<PatientDetailsCardProps> = ({ details, feedback, onUpdateDetails, isEditable }) => {
+    const { colors } = useTheme();
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedDetails, setEditedDetails] = useState(details);
+
+    const handleUpdate = (field: keyof PatientDetails, value: any) => {
+        setEditedDetails(prev => ({ ...prev, [field]: value }));
+    };
 
   const handleSave = () => {
     if (onUpdateDetails) {
@@ -41,93 +62,29 @@ const PatientDetailsCard: React.FC<PatientDetailsCardProps> = ({
     <View style={[styles.section, { backgroundColor: colors.card }]}>
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Patient Details</Text>
-        {isEditable && !isEditing && (
-          <TouchableOpacity onPress={() => setIsEditing(true)}>
-            <Ionicons name="pencil" size={20} color={colors.primary} />
-          </TouchableOpacity>
-        )}
-        {isEditable && isEditing && (
-          <TouchableOpacity onPress={handleSave}>
-            <Ionicons name="checkmark" size={24} color={colors.success} />
-          </TouchableOpacity>
-        )}
+        {isEditable && (
+                    <TouchableOpacity onPress={() => setIsEditing(!isEditing)}>
+                        <Ionicons name={isEditing ? "close" : "pencil"} size={24} color={colors.primary} />
+                    </TouchableOpacity>
+                )}
       </View>
 
-      <View style={styles.detailsGrid}>
-        <View style={styles.detailRow}>
-          <Text style={[styles.label, { color: colors.text }]}>Age:</Text>
-          {isEditing ? (
-            <TextInput
-              style={[styles.input, { color: colors.text, backgroundColor: colors.background }]}
-              value={editedDetails.age.toString()}
-              onChangeText={(value) => setEditedDetails({ ...editedDetails, age: parseInt(value) || 0 })}
-              keyboardType="number-pad"
-            />
-          ) : (
-            <Text style={[styles.value, { color: colors.textSecondary }]}>{details.age}</Text>
-          )}
-        </View>
-
-        <View style={styles.detailRow}>
-          <Text style={[styles.label, { color: colors.text }]}>Sex:</Text>
-          {isEditing ? (
-            <TextInput
-              style={[styles.input, { color: colors.text, backgroundColor: colors.background }]}
-              value={editedDetails.sex}
-              onChangeText={(value) => setEditedDetails({ ...editedDetails, sex: value as 'Male' | 'Female' | 'Other' })}
-            />
-          ) : (
-            <Text style={[styles.value, { color: colors.textSecondary }]}>{details.sex}</Text>
-          )}
-        </View>
-
-        <View style={styles.detailRow}>
-          <Text style={[styles.label, { color: colors.text }]}>Height:</Text>
-          {isEditing ? (
-            <TextInput
-              style={[styles.input, { color: colors.text, backgroundColor: colors.background }]}
-              value={editedDetails.height.toString()}
-              onChangeText={(value) => setEditedDetails({ ...editedDetails, height: parseFloat(value) || 0 })}
-              keyboardType="decimal-pad"
-            />
-          ) : (
-            <Text style={[styles.value, { color: colors.textSecondary }]}>{details.height} m</Text>
-          )}
-        </View>
-
-        <View style={styles.detailRow}>
-          <Text style={[styles.label, { color: colors.text }]}>Weight:</Text>
-          {isEditing ? (
-            <TextInput
-              style={[styles.input, { color: colors.text, backgroundColor: colors.background }]}
-              value={editedDetails.weight.toString()}
-              onChangeText={(value) => setEditedDetails({ ...editedDetails, weight: parseFloat(value) || 0 })}
-              keyboardType="decimal-pad"
-            />
-          ) : (
-            <Text style={[styles.value, { color: colors.textSecondary }]}>{details.weight} kg</Text>
-          )}
-        </View>
-
-        <View style={styles.detailRow}>
-          <Text style={[styles.label, { color: colors.text }]}>BMI:</Text>
-          <Text style={[styles.value, { color: colors.textSecondary }]}>{details.bmi.toFixed(1)}</Text>
-        </View>
+      <View style={styles.grid}>
+        <DetailRow label="Age" value={`${details.age} yrs`} />
+        <DetailRow label="Sex" value={details.sex} />
+        <DetailRow label="Height" value={`${details.height} m`} />
+        <DetailRow label="Weight" value={`${details.weight} kg`} />
+        <DetailRow label="BMI" value={details.bmi.toFixed(1)} />
       </View>
-
-      <View style={styles.clinicalInfoContainer}>
-        <Text style={[styles.label, { color: colors.text }]}>Other Clinical Info:</Text>
-        {isEditing ? (
-          <TextInput
-            style={[styles.clinicalInfoInput, { color: colors.text, backgroundColor: colors.background }]}
-            value={editedDetails.clinicalInfo}
-            onChangeText={(value) => setEditedDetails({ ...editedDetails, clinicalInfo: value })}
+      <View style={styles.clinicalInfoSection}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Clinical Information</Text>
+        <DetailRow 
+            label=""
+            value={details.clinicalInfo} 
+            isEditable={isEditing}
+            onChange={(text) => handleUpdate('clinicalInfo', text)}
             multiline
-            numberOfLines={4}
-          />
-        ) : (
-          <Text style={[styles.value, { color: colors.textSecondary }]}>{details.clinicalInfo}</Text>
-        )}
+        />
       </View>
     </View>
   );
@@ -262,6 +219,14 @@ const styles = StyleSheet.create({
   comments: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  clinicalInfoSection: {
+    marginTop: 16,
   },
 });
 

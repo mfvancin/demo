@@ -23,7 +23,6 @@ const SignupScreen = ({ navigation }: any) => {
     setLoading(true);
     try {
       await signup(name, email, password, role.toLowerCase() as 'patient' | 'doctor');
-      // Navigation will be handled by AppNavigator
     } catch (error) {
       Alert.alert('Signup Failed', 'Could not create account.');
     } finally {

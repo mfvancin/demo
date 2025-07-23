@@ -21,7 +21,7 @@ const MotionVisualizerSection = ({ movementData, colors }: { movementData: Movem
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentFrame((prev) => (prev + 1) % maxFrames);
-    }, 50); // 20fps animation
+    }, 50); 
     return () => clearInterval(interval);
   }, [maxFrames]);
 
@@ -44,9 +44,10 @@ const MotionVisualizerSection = ({ movementData, colors }: { movementData: Movem
 };
 
 const MotionMetricsSection = ({ movementData, colors }: { movementData: MovementData, colors: any }) => {
-  // Calculate range of motion metrics
   const calculateRangeOfMotion = () => {
-    if (!movementData.segmentOrientations?.length) return null;
+    if (!movementData.segmentOrientations?.length) {
+      return null;
+    }
 
     let maxKneeFlexion = 0;
     let maxKneeExtension = 180;
@@ -54,12 +55,10 @@ const MotionMetricsSection = ({ movementData, colors }: { movementData: Movement
     let maxAnkleDorsiflexion = 0;
 
     movementData.segmentOrientations.forEach(orientation => {
-      // Calculate knee angle between femur and tibia
       const kneeAngle = movementService.calculateJointAngle(orientation.femur, orientation.tibia);
       maxKneeFlexion = Math.max(maxKneeFlexion, kneeAngle);
       maxKneeExtension = Math.min(maxKneeExtension, kneeAngle);
 
-      // Calculate ankle angle between tibia and foot
       const ankleAngle = movementService.calculateJointAngle(orientation.tibia, orientation.foot);
       if (ankleAngle > 90) {
         maxAnkleFlexion = Math.max(maxAnkleFlexion, ankleAngle - 90);

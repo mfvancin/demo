@@ -72,67 +72,69 @@ const ProfileScreen = () => {
           </View>
         </View>
 
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Health Goals</Text>
-            {!isEditing ? (
-              <TouchableOpacity onPress={() => setIsEditing(true)}>
-                <Ionicons name="pencil" size={20} color={colors.primary} />
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.headerButtons}>
-                <TouchableOpacity onPress={handleReset} style={styles.resetButton}>
-                  <Ionicons name="refresh" size={20} color={colors.warning} />
+        {user.role === 'patient' && (
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
+            <View style={styles.cardHeader}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Health Goals</Text>
+              {!isEditing ? (
+                <TouchableOpacity onPress={() => setIsEditing(true)}>
+                  <Ionicons name="pencil" size={20} color={colors.primary} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleSaveGoals}>
-                  <Ionicons name="checkmark" size={24} color={colors.success} />
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
+              ) : (
+                <View style={styles.headerButtons}>
+                  <TouchableOpacity onPress={handleReset} style={styles.resetButton}>
+                    <Ionicons name="refresh" size={20} color={colors.warning} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleSaveGoals}>
+                    <Ionicons name="checkmark" size={24} color={colors.success} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
 
-          <View style={[styles.infoRow, { borderBottomColor: colors.mediumGray }]}>
-            <Text style={[styles.label, { color: colors.text }]}>Daily Steps</Text>
-            {isEditing ? (
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                value={tempGoals.steps.toString()}
-                onChangeText={(value) => setTempGoals({ ...tempGoals, steps: parseInt(value) || 0 })}
-                keyboardType="number-pad"
-              />
-            ) : (
-              <Text style={[styles.value, { color: colors.textSecondary }]}>{goals.steps.toLocaleString()}</Text>
-            )}
-          </View>
+            <View style={[styles.infoRow, { borderBottomColor: colors.mediumGray }]}>
+              <Text style={[styles.label, { color: colors.text }]}>Daily Steps</Text>
+              {isEditing ? (
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={tempGoals.steps.toString()}
+                  onChangeText={(value) => setTempGoals({ ...tempGoals, steps: parseInt(value) || 0 })}
+                  keyboardType="number-pad"
+                />
+              ) : (
+                <Text style={[styles.value, { color: colors.textSecondary }]}>{goals.steps.toLocaleString()}</Text>
+              )}
+            </View>
 
-          <View style={[styles.infoRow, { borderBottomColor: colors.mediumGray }]}>
-            <Text style={[styles.label, { color: colors.text }]}>Daily Calories</Text>
-            {isEditing ? (
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                value={tempGoals.calories.toString()}
-                onChangeText={(value) => setTempGoals({ ...tempGoals, calories: parseInt(value) || 0 })}
-                keyboardType="number-pad"
-              />
-            ) : (
-              <Text style={[styles.value, { color: colors.textSecondary }]}>{goals.calories}</Text>
-            )}
-          </View>
+            <View style={[styles.infoRow, { borderBottomColor: colors.mediumGray }]}>
+              <Text style={[styles.label, { color: colors.text }]}>Daily Calories</Text>
+              {isEditing ? (
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={tempGoals.calories.toString()}
+                  onChangeText={(value) => setTempGoals({ ...tempGoals, calories: parseInt(value) || 0 })}
+                  keyboardType="number-pad"
+                />
+              ) : (
+                <Text style={[styles.value, { color: colors.textSecondary }]}>{goals.calories}</Text>
+              )}
+            </View>
 
-          <View style={[styles.infoRow, { borderBottomColor: colors.mediumGray }]}>
-            <Text style={[styles.label, { color: colors.text }]}>Active Minutes</Text>
-            {isEditing ? (
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                value={tempGoals.activeMinutes.toString()}
-                onChangeText={(value) => setTempGoals({ ...tempGoals, activeMinutes: parseInt(value) || 0 })}
-                keyboardType="number-pad"
-              />
-            ) : (
-              <Text style={[styles.value, { color: colors.textSecondary }]}>{goals.activeMinutes}</Text>
-            )}
+            <View style={[styles.infoRow, { borderBottomColor: colors.mediumGray }]}>
+              <Text style={[styles.label, { color: colors.text }]}>Active Minutes</Text>
+              {isEditing ? (
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={tempGoals.activeMinutes.toString()}
+                  onChangeText={(value) => setTempGoals({ ...tempGoals, activeMinutes: parseInt(value) || 0 })}
+                  keyboardType="number-pad"
+                />
+              ) : (
+                <Text style={[styles.value, { color: colors.textSecondary }]}>{goals.activeMinutes}</Text>
+              )}
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.infoRow}>

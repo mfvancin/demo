@@ -1,167 +1,87 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { usePatients } from '../context/PatientContext';
-import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { RecoveryProcess, Medication } from '../types';
+import { usePatients } from '@context/PatientContext';
+import * as patientService from '@services/patientService';
+import type { Patient } from '../types';
 
-interface Exercise {
-    name: string;
-    completed: boolean;
-}
-
-const CreatePatientScreen = () => {
+const CreatePatientScreen = ({ navigation }: any) => {
     const { colors } = useTheme();
-    const { createPatient } = usePatients();
-    const navigation = useNavigation();
-    const [name, setName] = useState('');
-    const [exercises, setExercises] = useState<Exercise[]>([]);
-    const [medications, setMedications] = useState<Medication[]>([]);
-    const [newExercise, setNewExercise] = useState('');
-    const [newMedication, setNewMedication] = useState({ name: '', dosage: '' });
+    const { assignPatient } = usePatients();
+    const [unassignedPatients, setUnassignedPatients] = useState<Patient[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const addExercise = () => {
-        if (newExercise.trim()) {
-            setExercises([...exercises, { name: newExercise, completed: false }]);
-            setNewExercise('');
+    const fetchUnassignedPatients = useCallback(async () => {
+        try {
+            setLoading(true);
+            const data = await patientService.getUnassignedPatients();
+            setUnassignedPatients(data);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to fetch unassigned patients.');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchUnassignedPatients();
+    }, [fetchUnassignedPatients]);
+    
+    const handleAssignPatient = async (patientId: string) => {
+        try {
+            await assignPatient(patientId);
+            Alert.alert('Success', 'Patient assigned successfully.');
+            fetchUnassignedPatients(); // Refresh the list
+        } catch (error) {
+            Alert.alert('Error', 'Failed to assign patient.');
         }
     };
 
-    const addMedication = () => {
-        if (newMedication.name.trim() && newMedication.dosage.trim()) {
-            setMedications([
-                ...medications,
-                {
-                    id: `med_${Date.now()}`,
-                    name: newMedication.name,
-                    dosage: newMedication.dosage,
-                    completed: false
-                }
-            ]);
-            setNewMedication({ name: '', dosage: '' });
-        }
-    };
+    const renderPatientItem = ({ item }: { item: Patient }) => (
+        <View style={[styles.patientCard, { backgroundColor: colors.card }]}>
+            <View style={styles.patientInfo}>
+                <View style={[styles.avatar, { backgroundColor: colors.purple[100] }]}>
+                    <Text style={[styles.avatarText, { color: colors.purple[600] }]}>
+                        {item.name.split(' ').map(n => n[0]).join('')}
+                    </Text>
+                </View>
+                <Text style={[styles.patientName, { color: colors.text }]}>{item.name}</Text>
+            </View>
+            <TouchableOpacity 
+                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                onPress={() => handleAssignPatient(item.id)}
+            >
+                <Ionicons name="add" size={24} color={colors.white} />
+            </TouchableOpacity>
+        </View>
+    );
 
-    const removeExercise = (index: number) => {
-        setExercises(exercises.filter((_, i) => i !== index));
-    };
-
-    const removeMedication = (index: number) => {
-        setMedications(medications.filter((_, i) => i !== index));
-    };
-
-    const handleSave = () => {
-        if (!name.trim()) {
-            Alert.alert('Validation Error', 'Patient name cannot be empty.');
-            return;
-        }
-
-        if (exercises.length === 0) {
-            Alert.alert('Validation Error', 'Please add at least one exercise.');
-            return;
-        }
-
-        const recovery_process: RecoveryProcess[] = exercises.map((ex, index) => ({
-            id: `rp${index + 1}`,
-            name: ex.name,
-            completed: ex.completed
-        }));
-
-        const newPatient = createPatient(name);
-        newPatient.recovery_process = recovery_process;
-        newPatient.medications = medications;
-        
-        Alert.alert('Success', `Patient "${name}" created successfully.`, [
-            { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
-    };
+    if (loading) {
+        return (
+            <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-            <ScrollView style={styles.container}>
-                <Text style={[styles.title, { color: colors.text }]}>Create New Patient</Text>
-                
-                {/* Patient Name */}
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Patient Information</Text>
-                <TextInput
-                    style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.mediumGray }]}
-                    placeholder="Patient's Full Name"
-                    value={name}
-                    onChangeText={setName}
-                    placeholderTextColor={colors.textSecondary}
-                    autoCapitalize="words"
-                />
-
-                {/* Exercises Section */}
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Exercises</Text>
-                <View style={styles.addSection}>
-                    <TextInput
-                        style={[styles.input, { flex: 1, backgroundColor: colors.card, color: colors.text, borderColor: colors.mediumGray }]}
-                        placeholder="Exercise Name"
-                        value={newExercise}
-                        onChangeText={setNewExercise}
-                        placeholderTextColor={colors.textSecondary}
-                    />
-                    <TouchableOpacity 
-                        style={[styles.addButton, { backgroundColor: colors.primary }]}
-                        onPress={addExercise}
-                    >
-                        <Ionicons name="add" size={24} color={colors.white} />
-                    </TouchableOpacity>
-                </View>
-                {exercises.map((exercise, index) => (
-                    <View key={index} style={[styles.itemContainer, { backgroundColor: colors.card }]}>
-                        <Text style={[styles.itemText, { color: colors.text }]}>{exercise.name}</Text>
-                        <TouchableOpacity onPress={() => removeExercise(index)}>
-                            <Ionicons name="close-circle" size={24} color={colors.notification} />
-                        </TouchableOpacity>
+            <FlatList
+                data={unassignedPatients}
+                renderItem={renderPatientItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.container}
+                ListHeaderComponent={() => (
+                    <Text style={[styles.title, { color: colors.text }]}>Assign New Patient</Text>
+                )}
+                ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                        <Ionicons name="person-add-outline" size={48} color={colors.textSecondary} />
+                        <Text style={[styles.emptyText, { color: colors.text }]}>No new patients to assign</Text>
                     </View>
-                ))}
-
-                {/* Medications Section */}
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Medications</Text>
-                <View style={styles.addSection}>
-                    <TextInput
-                        style={[styles.input, { flex: 1, backgroundColor: colors.card, color: colors.text, borderColor: colors.mediumGray }]}
-                        placeholder="Medication Name"
-                        value={newMedication.name}
-                        onChangeText={(text) => setNewMedication({ ...newMedication, name: text })}
-                        placeholderTextColor={colors.textSecondary}
-                    />
-                    <TextInput
-                        style={[styles.input, { flex: 1, backgroundColor: colors.card, color: colors.text, borderColor: colors.mediumGray, marginLeft: 8 }]}
-                        placeholder="Dosage"
-                        value={newMedication.dosage}
-                        onChangeText={(text) => setNewMedication({ ...newMedication, dosage: text })}
-                        placeholderTextColor={colors.textSecondary}
-                    />
-                    <TouchableOpacity 
-                        style={[styles.addButton, { backgroundColor: colors.primary }]}
-                        onPress={addMedication}
-                    >
-                        <Ionicons name="add" size={24} color={colors.white} />
-                    </TouchableOpacity>
-                </View>
-                {medications.map((medication, index) => (
-                    <View key={index} style={[styles.itemContainer, { backgroundColor: colors.card }]}>
-                        <View>
-                            <Text style={[styles.itemText, { color: colors.text }]}>{medication.name}</Text>
-                            <Text style={[styles.dosageText, { color: colors.textSecondary }]}>{medication.dosage}</Text>
-                        </View>
-                        <TouchableOpacity onPress={() => removeMedication(index)}>
-                            <Ionicons name="close-circle" size={24} color={colors.notification} />
-                        </TouchableOpacity>
-                    </View>
-                ))}
-
-                <TouchableOpacity 
-                    style={[styles.saveButton, { backgroundColor: colors.primary }]} 
-                    onPress={handleSave}
-                >
-                    <Text style={[styles.saveButtonText, { color: colors.white }]}>Create Patient</Text>
-                </TouchableOpacity>
-            </ScrollView>
+                }
+            />
         </SafeAreaView>
     );
 };
@@ -174,64 +94,58 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 16,
     },
-    title: {
-        fontSize: 34,
-        fontWeight: 'bold',
-        marginBottom: 24,
+    listContainer: {
+        gap: 12,
     },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '600',
-        marginTop: 20,
-        marginBottom: 12,
-    },
-    input: {
-        height: 50,
-        marginBottom: 16,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-        fontSize: 17,
-        borderWidth: 1,
-    },
-    addSection: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    addButton: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginLeft: 8,
-    },
-    itemContainer: {
+    patientCard: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 16,
         borderRadius: 12,
-        marginBottom: 8,
     },
-    itemText: {
-        fontSize: 17,
-        fontWeight: '500',
-    },
-    dosageText: {
-        fontSize: 14,
-        marginTop: 4,
-    },
-    saveButton: {
-        padding: 16,
-        borderRadius: 12,
+    patientInfo: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 24,
-        marginBottom: 40,
+        gap: 16,
     },
-    saveButtonText: {
-        fontSize: 17,
+    avatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarText: {
+        fontSize: 16,
         fontWeight: '600',
+    },
+    patientName: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    addButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 50,
+    },
+    emptyText: {
+        marginTop: 16,
+        fontSize: 18,
+        color: '#8E8E93',
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginBottom: 20,
     },
 });
 

@@ -101,7 +101,7 @@ export interface PatientFeedback {
 export interface Patient {
   id: string;
   name: string;
-  details: PatientDetails;
+  details?: PatientDetails;
   recovery_process: RecoveryProcess[];
   doctor?: {
     id: string;

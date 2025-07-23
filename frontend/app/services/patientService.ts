@@ -1,0 +1,51 @@
+import api from './api';
+import type { Patient } from '../types/index';
+import axios from 'axios';
+
+export const getPatientsForDoctor = async (doctorId: string): Promise<Patient[]> => {
+    try {
+        const response = await api.get(`/doctors/${doctorId}/patients`);
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch patients for doctor:', error);
+        throw error;
+    }
+};
+
+export const getPatientById = async (patientId: string): Promise<Patient | null> => {
+    try {
+        const response = await api.get(`/patients/${patientId}`);
+        return response.data;
+    } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+            return null;
+        }
+        console.error('Failed to fetch patient by ID:', error);
+        throw error;
+    }
+};
+
+export const getUnassignedPatients = async (): Promise<Patient[]> => {
+    try {
+        const response = await api.get('/patients/unassigned');
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch unassigned patients:', error);
+        throw error;
+    }
+};
+
+export const assignPatientToDoctor = async (patientId: string): Promise<void> => {
+    try {
+        await api.post(`/patients/${patientId}/assign-doctor`);
+    } catch (error) {
+        console.error('Failed to assign patient to doctor:', error);
+        throw error;
+    }
+};
+
+export default {
+    getPatientsForDoctor,
+    getUnassignedPatients,
+    assignPatientToDoctor,
+}; 

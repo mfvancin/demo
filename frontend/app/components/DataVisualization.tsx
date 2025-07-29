@@ -182,7 +182,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
             </View>
 
             <View style={styles.comContainer}>
-                <Text style={[styles.comTitle, { color: colors.text }]}>Stride Analysis</Text>
+                <Text style={[styles.comTitle, { color: colors.text }]}>Stride</Text>
                 <View style={styles.comMetricsContainer}>
                     <View style={styles.comMetricItem}>
                         <Text style={[styles.comValue, { color: colors.primary }]}>

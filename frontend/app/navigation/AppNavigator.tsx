@@ -105,15 +105,6 @@ const PatientTabNavigator = () => {
           ),
         }}
       />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
-        }}
-      />
     </Tab.Navigator>
   );
 };
@@ -145,11 +136,11 @@ const DoctorTabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
+        name="Live Session"
+        component={MovellaScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+            <Ionicons name="recording-outline" size={size} color={color} />
           ),
         }}
       />
@@ -199,6 +190,14 @@ const AppNavigator = () => {
               component={CreatePatientScreen}
               options={{
                 headerTitle: 'Add New Patient',
+                headerBackTitle: 'Back',
+              }}
+            />
+            <Stack.Screen
+              name="Profile"
+              component={ProfileScreen}
+              options={{
+                headerTitle: 'Profile',
                 headerBackTitle: 'Back',
               }}
             />

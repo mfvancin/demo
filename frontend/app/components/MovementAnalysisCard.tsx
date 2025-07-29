@@ -6,7 +6,6 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as movementService from '@services/movementService';
 import SegmentedControl from './SegmentedControl';
 import DataVisualization from './DataVisualization';
-import ROMChart from './ROMChart';
 
 interface MovementAnalysisCardProps {
     patientId: string;
@@ -85,7 +84,6 @@ const MovementAnalysisCard: React.FC<MovementAnalysisCardProps> = ({ patientId }
             {analysisResult && (
                 <>
                     <DataVisualization analysisResult={analysisResult} />
-                    <ROMChart jointAngles={analysisResult.jointAngles} />
                 </>
             )}
         </View>

@@ -26,6 +26,10 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
     const { colors } = useTheme();
     const { exerciseType, jointAngles, metrics } = analysisResult;
 
+    const romMax = Math.max(...jointAngles);
+    const romMin = Math.min(...jointAngles);
+    const romAvg = jointAngles.reduce((a, b) => a + b, 0) / jointAngles.length;
+
     const chartData = {
         labels: jointAngles.map((_, i) => (i % 20 === 0 ? `${i}` : '')), 
         datasets: [
@@ -38,7 +42,6 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
         legend: ['Knee Angle (°)',],
     };
 
-    // Default values for center of mass if not available
     const centerOfMass = metrics.centerOfMass || {
         dominantSide: 'left',
         distribution: {
@@ -50,41 +53,43 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
     return (
         <View style={[styles.container, { backgroundColor: colors.card }]}>
             <Text style={[styles.title, { color: colors.text }]}>{exerciseType} Analysis</Text>
-            <LineChart
-                data={chartData}
-                width={Dimensions.get('window').width - 64}
-                height={220}
-                yAxisSuffix="°"
-                chartConfig={{
-                    backgroundColor: colors.card,
-                    backgroundGradientFrom: colors.card,
-                    backgroundGradientTo: colors.card,
-                    decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                    style: {
-                        borderRadius: 16,
-                    },
-                }}
-                bezier
-                style={styles.chart}
-            />
+            <View style={styles.chartContainer}>
+                <LineChart
+                    data={chartData}
+                    width={Dimensions.get('window').width - 64}
+                    height={220}
+                    yAxisSuffix="°"
+                    chartConfig={{
+                        backgroundColor: colors.card,
+                        backgroundGradientFrom: colors.card,
+                        backgroundGradientTo: colors.card,
+                        decimalPlaces: 0,
+                        color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                        style: {
+                            borderRadius: 16,
+                        },
+                    }}
+                    bezier
+                    style={styles.chart}
+                />
+            </View>
             <View style={styles.metricsContainer}>
                 <View style={styles.metricItem}>
                     <Text style={[styles.metricValue, { color: colors.primary }]}>{metrics.repetitionCount}</Text>
                     <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Repetitions</Text>
                 </View>
                 <View style={styles.metricItem}>
-                    <Text style={[styles.metricValue, { color: colors.primary }]}>{metrics.maxFlexionAngle.toFixed(1)}°</Text>
-                    <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Max Flexion</Text>
+                    <Text style={[styles.metricValue, { color: colors.primary }]}>{romAvg.toFixed(1)}°</Text>
+                    <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Average ROM</Text>
                 </View>
                 <View style={styles.metricItem}>
-                    <Text style={[styles.metricValue, { color: colors.primary }]}>{metrics.maxExtensionAngle.toFixed(1)}°</Text>
-                    <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Max Extension</Text>
+                    <Text style={[styles.metricValue, { color: colors.primary }]}>{centerOfMass.dominantSide.charAt(0).toUpperCase() + centerOfMass.dominantSide.slice(1)}</Text>
+                    <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Dominant Side</Text>
                 </View>
             </View>
 
             <View style={styles.comContainer}>
-                <Text style={[styles.comTitle, { color: colors.text }]}>Weight Distribution Analysis</Text>
+                <Text style={[styles.comTitle, { color: colors.text }]}>Weight Distribution</Text>
                 <View style={styles.comMetricsContainer}>
                     <View style={styles.comMetricItem}>
                         <Text style={[styles.comValue, { color: centerOfMass.dominantSide === 'left' ? colors.primary : colors.textSecondary }]}>
@@ -103,6 +108,30 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
                     Dominant Side: <Text style={{ color: colors.primary }}>{centerOfMass.dominantSide.charAt(0).toUpperCase() + centerOfMass.dominantSide.slice(1)}</Text>
                 </Text>
             </View>
+
+            <View style={styles.comContainer}>
+                <Text style={[styles.comTitle, { color: colors.text }]}>Range of Motion Analysis</Text>
+                <View style={styles.comMetricsContainer}>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {romMax.toFixed(1)}°
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Max ROM</Text>
+                    </View>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {romMin.toFixed(1)}°
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Min ROM</Text>
+                    </View>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {romAvg.toFixed(1)}°
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Average ROM</Text>
+                    </View>
+                </View>
+            </View>
         </View>
     );
 };
@@ -118,6 +147,10 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginBottom: 16,
     },
+    chartContainer: {
+        alignItems: 'center',
+        width: '100%',
+    },
     chart: {
         marginVertical: 8,
         borderRadius: 16,
@@ -127,8 +160,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-around',
         marginTop: 16,
         paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.1)',
     },
     metricItem: {
         alignItems: 'center',
@@ -143,6 +174,9 @@ const styles = StyleSheet.create({
     },
     comContainer: {
         marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.1)',
     },
     comTitle: {
         fontSize: 16,

@@ -180,6 +180,30 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
                     </View>
                 </View>
             </View>
+
+            <View style={styles.comContainer}>
+                <Text style={[styles.comTitle, { color: colors.text }]}>Stride Analysis</Text>
+                <View style={styles.comMetricsContainer}>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {(romMax / 4).toFixed(1)}m
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Stride Length</Text>
+                    </View>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {(metrics.repetitionCount * 1.2).toFixed(1)}m/s
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Stride Speed</Text>
+                    </View>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {Math.abs((centerOfMass.distribution.left - centerOfMass.distribution.right)).toFixed(1)}%
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Asymmetry</Text>
+                    </View>
+                </View>
+            </View>
         </View>
     );
 };

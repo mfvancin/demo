@@ -156,6 +156,30 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
                     </View>
                 </View>
             </View>
+
+            <View style={styles.comContainer}>
+                <Text style={[styles.comTitle, { color: colors.text }]}>Cadence</Text>
+                <View style={styles.comMetricsContainer}>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {(metrics.repetitionCount * 2).toFixed(1)}
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Reps/min</Text>
+                    </View>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {(60 / metrics.repetitionCount).toFixed(1)}s
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Time/Rep</Text>
+                    </View>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {(metrics.repetitionCount / 2).toFixed(1)}
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Sets</Text>
+                    </View>
+                </View>
+            </View>
         </View>
     );
 };

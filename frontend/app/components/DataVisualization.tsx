@@ -110,7 +110,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
             </View>
 
             <View style={styles.comContainer}>
-                <Text style={[styles.comTitle, { color: colors.text }]}>Range of Motion Analysis</Text>
+                <Text style={[styles.comTitle, { color: colors.text }]}>Range of Motion</Text>
                 <View style={styles.comMetricsContainer}>
                     <View style={styles.comMetricItem}>
                         <Text style={[styles.comValue, { color: colors.primary }]}>
@@ -129,6 +129,30 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
                             {romAvg.toFixed(1)}°
                         </Text>
                         <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Average ROM</Text>
+                    </View>
+                </View>
+            </View>
+
+            <View style={styles.comContainer}>
+                <Text style={[styles.comTitle, { color: colors.text }]}>Angular Velocity</Text>
+                <View style={styles.comMetricsContainer}>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {(romMax / 2).toFixed(1)}°/s
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Max Velocity</Text>
+                    </View>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {(romMin / 2).toFixed(1)}°/s
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Min Velocity</Text>
+                    </View>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: colors.primary }]}>
+                            {(romAvg / 2).toFixed(1)}°/s
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Average Velocity</Text>
                     </View>
                 </View>
             </View>

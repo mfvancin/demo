@@ -52,7 +52,6 @@ const CustomHeader: React.FC<StackHeaderProps> = ({ navigation, route, options }
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.notificationButton}>
             <Ionicons name="notifications-outline" size={24} color={colors.text} />
-            <View style={[styles.notificationBadge, { backgroundColor: colors.notification }]} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.avatarButton}
@@ -262,7 +261,6 @@ const styles = StyleSheet.create({
   },
   notificationButton: {
     padding: 8,
-    position: 'relative',
   },
   notificationBadge: {
     position: 'absolute',

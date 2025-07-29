@@ -203,11 +203,9 @@ def get_patient(current_user, patient_id):
 @app.route('/doctors/<doctor_id>/patients', methods=['GET'])
 @token_required
 def get_doctor_patients(current_user, doctor_id):
-    # Check if user is the doctor
     if current_user['role'] != 'doctor' or current_user['id'] != doctor_id:
         return jsonify({"error": "Unauthorized"}), 403
 
-    # Per user request, display all mock patients on the clinical dashboard
     return jsonify(list(patients.values()))
 
 @app.route('/patients/unassigned', methods=['GET'])
@@ -218,7 +216,6 @@ def get_unassigned_patients(current_user):
     
     assigned_patient_ids = {patient_id for patient_list in doctors_patients.values() for patient_id in patient_list}
     
-    # New patients who sign up will appear here until assigned
     unassigned_patients = [
         patient for patient_id, patient in patients.items() 
         if patient_id not in assigned_patient_ids

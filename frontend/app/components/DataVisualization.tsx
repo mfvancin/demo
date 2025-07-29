@@ -11,6 +11,13 @@ interface DataVisualizationProps {
             repetitionCount: number;
             maxFlexionAngle: number;
             maxExtensionAngle: number;
+            centerOfMass?: {
+                dominantSide: 'left' | 'right';
+                distribution: {
+                    left: number;
+                    right: number;
+                };
+            };
         };
     };
 }
@@ -29,6 +36,15 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
             },
         ],
         legend: ['Knee Angle (°)',],
+    };
+
+    // Default values for center of mass if not available
+    const centerOfMass = metrics.centerOfMass || {
+        dominantSide: 'left',
+        distribution: {
+            left: 50,
+            right: 50
+        }
     };
 
     return (
@@ -66,6 +82,27 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ analysisResult })
                     <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Max Extension</Text>
                 </View>
             </View>
+
+            <View style={styles.comContainer}>
+                <Text style={[styles.comTitle, { color: colors.text }]}>Weight Distribution Analysis</Text>
+                <View style={styles.comMetricsContainer}>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: centerOfMass.dominantSide === 'left' ? colors.primary : colors.textSecondary }]}>
+                            {centerOfMass.distribution.left.toFixed(1)}%
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Left Side</Text>
+                    </View>
+                    <View style={styles.comMetricItem}>
+                        <Text style={[styles.comValue, { color: centerOfMass.dominantSide === 'right' ? colors.primary : colors.textSecondary }]}>
+                            {centerOfMass.distribution.right.toFixed(1)}%
+                        </Text>
+                        <Text style={[styles.comLabel, { color: colors.textSecondary }]}>Right Side</Text>
+                    </View>
+                </View>
+                <Text style={[styles.dominantSideText, { color: colors.text }]}>
+                    Dominant Side: <Text style={{ color: colors.primary }}>{centerOfMass.dominantSide.charAt(0).toUpperCase() + centerOfMass.dominantSide.slice(1)}</Text>
+                </Text>
+            </View>
         </View>
     );
 };
@@ -89,6 +126,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         marginTop: 16,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.1)',
     },
     metricItem: {
         alignItems: 'center',
@@ -100,6 +140,36 @@ const styles = StyleSheet.create({
     metricLabel: {
         fontSize: 14,
         marginTop: 4,
+    },
+    comContainer: {
+        marginTop: 16,
+    },
+    comTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 12,
+    },
+    comMetricsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginBottom: 12,
+    },
+    comMetricItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    comValue: {
+        fontSize: 24,
+        fontWeight: 'bold',
+    },
+    comLabel: {
+        fontSize: 14,
+        marginTop: 4,
+    },
+    dominantSideText: {
+        textAlign: 'center',
+        fontSize: 16,
+        marginTop: 8,
     },
 });
 

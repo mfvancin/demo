@@ -183,6 +183,9 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }, exerc
 
     console.log(`Processing ${exerciseType} data:`, numFrames, 'frames');
 
+    const leftWeightDistribution: number[] = [];
+    const rightWeightDistribution: number[] = [];
+
     for (let i = 0; i < numFrames; i++) {
         const thighRow = thighData[i];
         const shinRow = shinData[i];
@@ -224,6 +227,12 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }, exerc
         if (angle >= 0 && angle <= 180) {
             jointAngles.push(angle);
         }
+
+        const leftWeight = Math.abs(thighRow.Euler_Y || 0) + Math.abs(shinRow.Euler_Y || 0);
+        const rightWeight = Math.abs(thighRow.Euler_Z || 0) + Math.abs(shinRow.Euler_Z || 0);
+        
+        leftWeightDistribution.push(leftWeight);
+        rightWeightDistribution.push(rightWeight);
     }
 
     if (jointAngles.length === 0) {
@@ -234,6 +243,13 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }, exerc
                 repetitionCount: 0,
                 maxFlexionAngle: 0,
                 maxExtensionAngle: 0,
+                centerOfMass: {
+                    dominantSide: 'left',
+                    distribution: {
+                        left: 50,
+                        right: 50
+                    }
+                }
             },
         };
     }
@@ -241,12 +257,17 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }, exerc
     const maxExtensionAngle = Math.max(...jointAngles);
     const maxFlexionAngle = Math.min(...jointAngles);
 
+    const avgLeftWeight = leftWeightDistribution.reduce((a, b) => a + b, 0) / leftWeightDistribution.length;
+    const avgRightWeight = rightWeightDistribution.reduce((a, b) => a + b, 0) / rightWeightDistribution.length;
+    
+    const totalWeight = avgLeftWeight + avgRightWeight;
+    const leftPercentage = (avgLeftWeight / totalWeight) * 100;
+    const rightPercentage = (avgRightWeight / totalWeight) * 100;
+
     let repThreshold;
     if (exerciseType === 'Squat') {
-        // Keep fixed threshold for squats as it's working reliably
-        repThreshold = 100; 
+        repThreshold = 100;
     } else {
-        // Dynamic threshold for leg extensions: 80% of the patient's actual ROM for this session
         repThreshold = maxFlexionAngle + (maxExtensionAngle - maxFlexionAngle) * 0.8;
     }
 
@@ -261,6 +282,13 @@ const calculateMetricsForExercise = (sensorData: { [key: string]: any[] }, exerc
             repetitionCount,
             maxFlexionAngle,
             maxExtensionAngle,
+            centerOfMass: {
+                dominantSide: leftPercentage > rightPercentage ? 'left' : 'right',
+                distribution: {
+                    left: leftPercentage,
+                    right: rightPercentage
+                }
+            }
         },
     };
 };

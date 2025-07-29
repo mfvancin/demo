@@ -12,11 +12,32 @@ interface MovementAnalysisCardProps {
     patientId: string;
 }
 
+interface AnalysisResult {
+    exerciseType: 'Squat' | 'Leg Knee Extension';
+    jointAngles: number[];
+    metrics: {
+        repetitionCount: number;
+        maxFlexionAngle: number;
+        maxExtensionAngle: number;
+        centerOfMass?: {
+            dominantSide: 'left' | 'right';
+            distribution: {
+                left: number;
+                right: number;
+            };
+        };
+    };
+}
+
 const MovementAnalysisCard: React.FC<MovementAnalysisCardProps> = ({ patientId }) => {
     const { colors } = useTheme();
-    const [analysisResult, setAnalysisResult] = useState<any>(null);
+    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedExercise, setSelectedExercise] = useState('Squat');
+    const [selectedExercise, setSelectedExercise] = useState<'Squat' | 'Leg Knee Extension'>('Squat');
+
+    const handleExerciseChange = (value: string) => {
+        setSelectedExercise(value as 'Squat' | 'Leg Knee Extension');
+    };
 
     const handleFileUpload = async () => {
         try {
@@ -27,8 +48,8 @@ const MovementAnalysisCard: React.FC<MovementAnalysisCardProps> = ({ patientId }
 
             if (!result.canceled && result.assets?.[0]) {
                 setIsLoading(true);
-                const analysis = await movementService.analyzeMovementData(result.assets[0].uri, selectedExercise as any);
-                setAnalysisResult(analysis);
+                const analysis = await movementService.analyzeMovementData(result.assets[0].uri, selectedExercise);
+                setAnalysisResult(analysis as AnalysisResult);
             }
         } catch (error) {
             console.error('Failed to analyze movement data:', error);
@@ -47,7 +68,7 @@ const MovementAnalysisCard: React.FC<MovementAnalysisCardProps> = ({ patientId }
             <SegmentedControl
                 options={['Squat', 'Leg Knee Extension']}
                 selectedValue={selectedExercise}
-                onValueChange={setSelectedExercise}
+                onValueChange={handleExerciseChange}
             />
 
             <TouchableOpacity 

@@ -32,7 +32,6 @@ export const PatientProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (user.role === 'doctor') {
         fetchedPatients = await patientService.getPatientsForDoctor(user.id);
       } else {
-        // Patients might see their own data, adjust if needed
         const patientData = await patientService.getPatientById(user.id);
         if (patientData) {
           fetchedPatients = [patientData];
@@ -59,7 +58,7 @@ export const PatientProvider: React.FC<{ children: ReactNode }> = ({ children })
   const assignPatient = async (patientId: string) => {
     try {
       await patientService.assignPatientToDoctor(patientId);
-      await fetchPatients(); // Refresh the list after assigning
+      await fetchPatients(); 
     } catch (error) {
       console.error("Failed to assign patient:", error);
       throw error;

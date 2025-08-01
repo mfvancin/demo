@@ -14,12 +14,19 @@ const SignupScreen = ({ navigation }: any) => {
   const [role, setRole] = useState('Patient');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const handleSignup = async () => {
     if (!name || !email || !password) {
       Alert.alert('Error', 'Please fill in all fields.');
       return;
     }
+    
+    if (!acceptedTerms) {
+      Alert.alert('Error', 'Please accept the Terms and Conditions to continue.');
+      return;
+    }
+    
     setLoading(true);
     try {
       await signup(name, email, password, role.toLowerCase() as 'patient' | 'doctor');
@@ -98,6 +105,28 @@ const SignupScreen = ({ navigation }: any) => {
             onValueChange={setRole}
           />
 
+          <View style={styles.termsContainer}>
+            <TouchableOpacity 
+              style={styles.checkboxContainer}
+              onPress={() => setAcceptedTerms(!acceptedTerms)}
+            >
+              <View style={[styles.checkbox, { 
+                backgroundColor: acceptedTerms ? colors.purple[600] : colors.card,
+                borderColor: colors.purple[600]
+              }]}>
+                {acceptedTerms && (
+                  <Ionicons name="checkmark" size={16} color={colors.white} />
+                )}
+              </View>
+              <Text style={[styles.termsText, { color: colors.textSecondary }]}>
+                I accept the{' '}
+                <Text style={[styles.termsLink, { color: colors.purple[600] }]}>
+                  Terms and Conditions
+                </Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity 
             style={[styles.button, { backgroundColor: colors.purple[600] }]} 
             onPress={handleSignup}
@@ -129,14 +158,14 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: 40,
+    paddingTop: 20,
     paddingHorizontal: 24,
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     resizeMode: 'contain',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   welcomeText: {
     fontSize: 16,
@@ -150,14 +179,14 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
   },
   form: {
     padding: 24,
   },
   inputContainer: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   input: {
     height: 56,
@@ -180,8 +209,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
-    marginBottom: 16,
+    marginTop: 16,
+    marginBottom: 12,
   },
   buttonText: {
     fontSize: 16,
@@ -199,6 +228,30 @@ const styles = StyleSheet.create({
     width: 200,
     height: 40,
     resizeMode: 'contain',
+  },
+  termsContainer: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  termsText: {
+    fontSize: 14,
+  },
+  termsLink: {
+    textDecorationLine: 'underline',
   },
 });
 

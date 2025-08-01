@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import AppNavigator from './app/navigation/AppNavigator';
-import { SafeAreaProvider } from 'react-native-safe-area-context';@
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from './app/theme/ThemeContext';
 import { AuthProvider } from './app/context/AuthContext';
 import { PatientProvider } from './app/context/PatientContext';

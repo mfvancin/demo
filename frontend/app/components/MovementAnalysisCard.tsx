@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import * as DocumentPicker from 'expo-document-picker';
 import * as movementService from '@services/movementService';
+import { exportMovementAnalysisPDF } from '@services/pdfExportService';
 import SegmentedControl from './SegmentedControl';
 import DataVisualization from './DataVisualization';
 
@@ -84,6 +85,22 @@ const MovementAnalysisCard: React.FC<MovementAnalysisCardProps> = ({ patientId }
             {analysisResult && (
                 <>
                     <DataVisualization analysisResult={analysisResult} />
+                    
+                    <TouchableOpacity 
+                        style={[styles.exportButton, { backgroundColor: colors.primary }]} 
+                        onPress={async () => {
+                            try {
+                                await exportMovementAnalysisPDF(analysisResult);
+                            } catch (error) {
+                                Alert.alert('Error', 'Failed to export PDF report. Please try again.');
+                            }
+                        }}
+                    >
+                        <Ionicons name="download-outline" size={20} color={colors.white} />
+                        <Text style={[styles.buttonText, { color: colors.white }]}>
+                            Export Report
+                        </Text>
+                    </TouchableOpacity>
                 </>
             )}
         </View>
@@ -113,6 +130,15 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 8,
         gap: 8,
+    },
+    exportButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 8,
+        gap: 8,
+        marginTop: 16,
     },
     buttonText: {
         fontWeight: '600',

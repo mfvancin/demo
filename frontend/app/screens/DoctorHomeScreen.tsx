@@ -74,24 +74,24 @@ const DoctorHomeScreen = ({ navigation }: any) => {
                     label="Total Patients"
                     color={colors.purple[500]}
                 />
-                <StatCard 
+                {/* <StatCard 
                     icon="fitness" 
                     value={activePatients} 
                     label="Active Patients"
                     color={colors.success}
-                />
+                /> */}
                 <StatCard 
                     icon="checkmark-circle" 
                     value={completedPatients} 
                     label="Completed"
                     color={colors.info}
                 />
-                <StatCard 
+                {/* <StatCard 
                     icon="trending-up" 
                     value={`${Math.round(averageProgress)}%`} 
                     label="Avg. Progress"
                     color={colors.warning}
-                />
+                /> */}
             </View>
 
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Patient List</Text>

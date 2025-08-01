@@ -3,5 +3,8 @@
     "@types/papaparse": "^5.3.16",
     "@types/react": "^19.1.8",
     "@types/react-native": "^0.72.8"
+  },
+  "dependencies": {
+    "react-native-reanimated": "^3.6.1"
   }
 }

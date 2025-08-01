@@ -4,10 +4,10 @@
     "slug": "demoirhisn",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/eucip.png",
+    "icon": "./assets/logo.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/eucip.png",
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },

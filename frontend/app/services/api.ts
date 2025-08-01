@@ -1,7 +1,18 @@
 import axios from 'axios';
 
-// Local development backend URL
-const API_URL = 'http://localhost:5001';
+// API URL configuration
+// For development: use local IP for real device testing, localhost for simulator
+// For production: use your deployed backend URL
+const getApiUrl = () => {
+  if (__DEV__) {
+    // In development, use local IP for real devices, localhost for simulator
+    return 'http://192.168.1.190:5001';
+  }
+  // In production, use your deployed backend URL
+  return 'https://irhisdemo-production.up.railway.app';
+};
+
+const API_URL = getApiUrl();
 
 const api = axios.create({
   baseURL: API_URL,

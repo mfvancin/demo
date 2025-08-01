@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import SegmentedControl from '../components/SegmentedControl';
+import TermsAndConditionsModal from '../components/TermsAndConditionsModal';
 import { useAuth } from '@context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,6 +16,7 @@ const SignupScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   const handleSignup = async () => {
     if (!name || !email || !password) {
@@ -120,9 +122,11 @@ const SignupScreen = ({ navigation }: any) => {
               </View>
               <Text style={[styles.termsText, { color: colors.textSecondary }]}>
                 I accept the{' '}
-                <Text style={[styles.termsLink, { color: colors.purple[600] }]}>
-                  Terms and Conditions
-                </Text>
+                <TouchableOpacity onPress={() => setShowTermsModal(true)}>
+                  <Text style={[styles.termsLink, { color: colors.purple[600] }]}>
+                    Terms and Conditions
+                  </Text>
+                </TouchableOpacity>
               </Text>
             </TouchableOpacity>
           </View>
@@ -144,6 +148,11 @@ const SignupScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <TermsAndConditionsModal 
+        visible={showTermsModal}
+        onClose={() => setShowTermsModal(false)}
+      />
     </SafeAreaView>
   );
 };

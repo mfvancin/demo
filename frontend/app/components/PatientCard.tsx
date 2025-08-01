@@ -2,12 +2,26 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import type { Patient } from '../types';
+import { Ionicons } from '@expo/vector-icons';
 
 const PatientCard = ({ item, navigation }: { item: Patient; navigation: any }) => {
     const { colors } = useTheme();
     const completedExercises = item.recovery_process.filter(ex => ex.completed).length;
     const totalExercises = item.recovery_process.length;
     const progress = totalExercises > 0 ? (completedExercises / totalExercises) * 100 : 0;
+
+    // Get the latest weekly feedback
+    const latestFeedback = item.feedback?.sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    )[0];
+
+    const renderFeedbackIndicator = (value: number, label: string, icon: string) => (
+        <View style={styles.feedbackItem}>
+            <Ionicons name={icon as any} size={16} color={colors.textSecondary} />
+            <Text style={[styles.feedbackLabel, { color: colors.textSecondary }]}>{label}</Text>
+            <Text style={[styles.feedbackValue, { color: colors.text }]}>{value}/10</Text>
+        </View>
+    );
 
     return (
         <TouchableOpacity 
@@ -47,7 +61,7 @@ const PatientCard = ({ item, navigation }: { item: Patient; navigation: any }) =
                 />
             </View>
 
-            {item.details ? (
+            {item.details && (
                 <View style={styles.dataPreview}>
                     <View style={styles.detailsColumn}>
                         <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Age</Text>
@@ -68,9 +82,21 @@ const PatientCard = ({ item, navigation }: { item: Patient; navigation: any }) =
                         <Text style={[styles.detailValue, { color: colors.text }]}>{item.details.bmi.toFixed(1)}</Text>
                     </View>
                 </View>
-            ) : (
-                <View style={styles.noDetailsContainer}>
-                    <Text style={[styles.noDetailsText, { color: colors.textSecondary }]}>No details available</Text>
+            )}
+
+            {latestFeedback && (
+                <View style={[styles.feedbackContainer, { borderTopColor: colors.border }]}>
+                    <Text style={[styles.feedbackTitle, { color: colors.text }]}>Latest Weekly Feedback</Text>
+                    <View style={styles.feedbackGrid}>
+                        {renderFeedbackIndicator(latestFeedback.pain, 'Pain', 'bandage-outline')}
+                        {renderFeedbackIndicator(latestFeedback.fatigue, 'Fatigue', 'battery-half-outline')}
+                        {renderFeedbackIndicator(latestFeedback.difficulty, 'Difficulty', 'barbell-outline')}
+                    </View>
+                    {latestFeedback.comments && (
+                        <Text style={[styles.comments, { color: colors.textSecondary }]} numberOfLines={2}>
+                            {latestFeedback.comments}
+                        </Text>
+                    )}
                 </View>
             )}
         </TouchableOpacity>
@@ -131,17 +157,6 @@ const styles = StyleSheet.create({
         height: '100%',
         borderRadius: 2,
     },
-    noDetailsContainer: {
-        marginTop: 16,
-        paddingTop: 16,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(0,0,0,0.05)',
-        alignItems: 'center',
-    },
-    noDetailsText: {
-        fontSize: 14,
-        fontStyle: 'italic',
-    },
     dataPreview: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -160,6 +175,38 @@ const styles = StyleSheet.create({
     detailValue: {
         fontSize: 14,
         fontWeight: '600',
+    },
+    feedbackContainer: {
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+    },
+    feedbackTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 12,
+    },
+    feedbackGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    feedbackItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    feedbackLabel: {
+        fontSize: 12,
+    },
+    feedbackValue: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    comments: {
+        fontSize: 12,
+        fontStyle: 'italic',
+        marginTop: 8,
     },
 });
 

@@ -1,5 +1,5 @@
-import React, { createContext, useState, useContext, ReactNode, useCallback } from 'react';
-import type { Patient } from '../types';
+import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
+import type { Patient, PatientFeedback } from '../types';
 import * as patientService from '@services/patientService';
 import { useAuth } from './AuthContext';
 
@@ -8,7 +8,7 @@ interface PatientContextData {
   loading: boolean;
   fetchPatients: () => Promise<void>;
   assignPatient: (patientId: string) => Promise<void>;
-  updatePatient: (patient: Patient) => void;
+  updatePatient: (patientId: string, updates: Partial<Patient>) => Promise<void>;
 }
 
 export const PatientContext = createContext<PatientContextData>({
@@ -16,7 +16,7 @@ export const PatientContext = createContext<PatientContextData>({
   loading: true,
   fetchPatients: async () => {},
   assignPatient: async () => {},
-  updatePatient: () => {},
+  updatePatient: async () => {},
 });
 
 export const PatientProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -50,6 +50,12 @@ export const PatientProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   }, [user]);
 
+  useEffect(() => {
+    if (user) {
+      fetchPatients();
+    }
+  }, [user, fetchPatients]);
+
   const assignPatient = async (patientId: string) => {
     try {
       await patientService.assignPatientToDoctor(patientId);
@@ -60,11 +66,26 @@ export const PatientProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  const updatePatient = (updatedPatient: Patient) => {
-    setPatients(prevPatients => ({
-      ...prevPatients,
-      [updatedPatient.id]: updatedPatient,
-    }));
+  const updatePatient = async (patientId: string, updates: Partial<Patient>) => {
+    try {
+      if (updates.feedback) {
+        await patientService.updatePatientFeedback(patientId, updates.feedback);
+      }
+
+      setPatients(prevPatients => {
+        const updatedPatient = {
+          ...prevPatients[patientId],
+          ...updates,
+        };
+        return {
+          ...prevPatients,
+          [patientId]: updatedPatient,
+        };
+      });
+    } catch (error) {
+      console.error("Failed to update patient:", error);
+      throw error;
+    }
   };
 
   return (

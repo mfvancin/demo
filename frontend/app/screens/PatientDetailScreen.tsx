@@ -17,7 +17,7 @@ import MovementAnalysisCard from '@components/MovementAnalysisCard';
 
 const PatientDetailScreen = ({ route, navigation }: any) => {
     const { colors } = useTheme();
-    const { patientId, role, completedExerciseId } = route.params;
+    const { patientId, role } = route.params;
     const { patients, updatePatient } = usePatients();
     const patientData = patients[patientId];
     const { healthData } = useHealth();
@@ -36,16 +36,9 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
         }
     }, [patientData]);
 
-    useEffect(() => {
-        if (completedExerciseId) {
-            handleToggleComplete(completedExerciseId, 'exercise');
-            navigation.setParams({ completedExerciseId: null });
-        }
-    }, [completedExerciseId]);
-
     const handleToggleComplete = (id: string, type: 'exercise' | 'medication') => {
         if (role !== 'patient') {
-          return;
+            return;
         }
 
         if (type === 'exercise') {
@@ -88,7 +81,7 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
         if (!patientData) return;
         try {
             const updatedPatient = await patientService.updatePatientDetails(patientData.id, details);
-            updatePatient(updatedPatient);
+            updatePatient(patientData.id, updatedPatient);
         } catch (error) {
             console.error('Failed to update details:', error);
             Alert.alert('Error', 'Could not update patient details.');
@@ -118,6 +111,35 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
             console.error('Error uploading movement data:', error);
         }
     };
+
+    const renderFeedbackItem = (feedback: any, index: number) => (
+        <View key={index} style={[styles.feedbackItem, { backgroundColor: colors.card }]}>
+            <View style={styles.feedbackHeader}>
+                <Text style={[styles.feedbackDate, { color: colors.textSecondary }]}>
+                    {new Date(feedback.timestamp).toLocaleDateString()}
+                </Text>
+                <View style={styles.feedbackMetrics}>
+                    <View style={styles.metricItem}>
+                        <Ionicons name="bandage-outline" size={16} color={colors.primary} />
+                        <Text style={[styles.metricValue, { color: colors.text }]}>{feedback.pain}/10</Text>
+                    </View>
+                    <View style={styles.metricItem}>
+                        <Ionicons name="battery-half-outline" size={16} color={colors.primary} />
+                        <Text style={[styles.metricValue, { color: colors.text }]}>{feedback.fatigue}/10</Text>
+                    </View>
+                    <View style={styles.metricItem}>
+                        <Ionicons name="barbell-outline" size={16} color={colors.primary} />
+                        <Text style={[styles.metricValue, { color: colors.text }]}>{feedback.difficulty}/10</Text>
+                    </View>
+                </View>
+            </View>
+            {feedback.comments && (
+                <Text style={[styles.feedbackComments, { color: colors.textSecondary }]}>
+                    {feedback.comments}
+                </Text>
+            )}
+        </View>
+    );
 
     const renderExerciseItem = ({ item }: { item: RecoveryProcess }) => (
         <TouchableOpacity 
@@ -170,7 +192,17 @@ const PatientDetailScreen = ({ route, navigation }: any) => {
                     isEditable={role === 'doctor'}
                 />
 
-                <AssignedExercisesCard patient={patientData} isEditable={role === 'doctor'} />
+                <AssignedExercisesCard patient={patientData} isEditable={role === 'doctor'} navigation={navigation} />
+                
+                {patientData.feedback && patientData.feedback.length > 0 && (
+                    <View style={[styles.section, { backgroundColor: colors.card }]}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Patient Feedback</Text>
+                        {patientData.feedback
+                            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                            .map((feedback, index) => renderFeedbackItem(feedback, index))
+                        }
+                    </View>
+                )}
                 
                 <MovementAnalysisCard patientId={patientData.id} />
 
@@ -394,14 +426,47 @@ const styles = StyleSheet.create({
     metric: {
         alignItems: 'center',
     },
-    healthMetricValue: {  // Renamed from metricValue
+    healthMetricValue: {
         fontSize: 20,
         fontWeight: 'bold',
         marginTop: 8,
         marginBottom: 4,
     },
-    healthMetricLabel: {  // Renamed from metricLabel
+    healthMetricLabel: {
         fontSize: 14,
+    },
+    feedbackItem: {
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 8,
+    },
+    feedbackHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    feedbackDate: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    feedbackMetrics: {
+        flexDirection: 'row',
+        gap: 16,
+    },
+    metricItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    metricValue: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    feedbackComments: {
+        fontSize: 14,
+        fontStyle: 'italic',
+        lineHeight: 20,
     },
 });
 

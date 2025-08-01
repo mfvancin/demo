@@ -9,9 +9,10 @@ import { usePatients } from '@context/PatientContext';
 interface AssignedExercisesCardProps {
     patient: Patient;
     isEditable: boolean;
+    navigation?: any;
 }
 
-const AssignedExercisesCard: React.FC<AssignedExercisesCardProps> = ({ patient, isEditable }) => {
+const AssignedExercisesCard: React.FC<AssignedExercisesCardProps> = ({ patient, isEditable, navigation }) => {
     const { colors } = useTheme();
     const { updatePatient } = usePatients();
     const [isEditing, setIsEditing] = useState(false);
@@ -20,7 +21,7 @@ const AssignedExercisesCard: React.FC<AssignedExercisesCardProps> = ({ patient, 
     const handleSave = async () => {
         try {
             const updatedPatient = await patientService.updateRecoveryProcess(patient.id, exercises);
-            updatePatient(updatedPatient);
+            updatePatient(patient.id, updatedPatient);
             setIsEditing(false);
             Alert.alert('Success', 'Exercise plan updated.');
         } catch (error) {
@@ -44,6 +45,12 @@ const AssignedExercisesCard: React.FC<AssignedExercisesCardProps> = ({ patient, 
             instructions: '',
         };
         setExercises(current => [...current, newExercise]);
+    };
+
+    const handleExercisePress = (exercise: RecoveryProcess) => {
+        if (!isEditable && navigation) {
+            navigation.navigate('ExerciseDetail', { exercise });
+        }
     };
     
     const renderExercise = ({ item }: { item: RecoveryProcess }) => {
@@ -83,12 +90,23 @@ const AssignedExercisesCard: React.FC<AssignedExercisesCardProps> = ({ patient, 
         }
 
         return (
-            <View style={styles.exerciseContainer}>
-                <Text style={[styles.exerciseName, { color: colors.text }]}>{item.name}</Text>
-                <Text style={[styles.exerciseDetails, { color: colors.textSecondary }]}>
-                    {item.targetRepetitions} reps, {item.targetSets} sets
-                </Text>
-            </View>
+            <TouchableOpacity 
+                style={styles.exerciseContainer}
+                onPress={() => handleExercisePress(item)}
+                disabled={isEditable}
+            >
+                <View style={styles.exerciseHeader}>
+                    <View>
+                        <Text style={[styles.exerciseName, { color: colors.text }]}>{item.name}</Text>
+                        <Text style={[styles.exerciseDetails, { color: colors.textSecondary }]}>
+                            {item.targetRepetitions} reps, {item.targetSets} sets
+                        </Text>
+                    </View>
+                    {!isEditable && (
+                        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                    )}
+                </View>
+            </TouchableOpacity>
         );
     };
 
@@ -141,6 +159,11 @@ const styles = StyleSheet.create({
     },
     exerciseContainer: {
         paddingVertical: 8,
+    },
+    exerciseHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     exerciseName: {
         fontSize: 16,

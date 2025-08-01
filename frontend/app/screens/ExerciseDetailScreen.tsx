@@ -8,11 +8,7 @@ const ExerciseDetailScreen = ({ route, navigation }: any) => {
     const { exercise } = route.params;
 
     const handleComplete = () => {
-        navigation.navigate({
-            name: 'PatientDetail',
-            params: { completedExerciseId: exercise.id },
-            merge: true,
-        });
+        navigation.goBack();
     };
 
     return (
@@ -33,7 +29,10 @@ const ExerciseDetailScreen = ({ route, navigation }: any) => {
                     Follow the animation to perform the exercise correctly. Focus on maintaining good form and a steady pace.
                 </Text>
 
-                <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={handleComplete}>
+                <TouchableOpacity 
+                    style={[styles.button, { backgroundColor: colors.primary }]} 
+                    onPress={handleComplete}
+                >
                     <Text style={[styles.buttonText, { color: colors.white }]}>Mark as Complete</Text>
                 </TouchableOpacity>
 

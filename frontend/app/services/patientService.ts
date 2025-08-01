@@ -1,5 +1,5 @@
 import api from './api';
-import type { Patient, PatientDetails, RecoveryProcess } from '../types/index';
+import type { Patient, PatientDetails, RecoveryProcess, PatientFeedback } from '../types/index';
 import axios from 'axios';
 
 export const getPatientsForDoctor = async (doctorId: string): Promise<Patient[]> => {
@@ -64,8 +64,19 @@ export const updateRecoveryProcess = async (patientId: string, recoveryProcess: 
     }
 };
 
+export const updatePatientFeedback = async (patientId: string, feedback: PatientFeedback[]): Promise<Patient> => {
+    try {
+        const response = await api.put(`/patients/${patientId}/feedback`, { feedback });
+        return response.data;
+    } catch (error) {
+        console.error('Failed to update patient feedback:', error);
+        throw error;
+    }
+};
+
 export default {
     getPatientsForDoctor,
     getUnassignedPatients,
     assignPatientToDoctor,
+    updatePatientFeedback,
 }; 

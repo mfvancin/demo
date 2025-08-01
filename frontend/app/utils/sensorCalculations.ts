@@ -1,9 +1,5 @@
 import * as THREE from 'three';
 
-/**
- * Represents a single row of parsed sensor data.
- * Can contain either Quaternion or Euler angle data.
- */
 export type SensorDataRow = {
     'Quat_W'?: number;
     'Quat_X'?: number;

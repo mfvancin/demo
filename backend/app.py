@@ -8,9 +8,8 @@ from functools import wraps
 
 app = Flask(__name__)
 CORS(app)
-app.config['SECRET_KEY'] = 'your-secret-key'  # In production, use a secure secret key
+app.config['SECRET_KEY'] = 'your-secret-key'  
 
-# --- Pre-populated mock data ---
 hashed_password_doctor = generate_password_hash('password')
 
 users = {
@@ -25,7 +24,9 @@ users = {
     '2': { "id": "2", "email": "jane.smith@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "Jane Smith" },
     '3': { "id": "3", "email": "robert.johnson@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "Robert Johnson" },
     '4': { "id": "4", "email": "emily.williams@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "Emily Williams" },
-    '5': { "id": "5", "email": "michael.brown@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "Michael Brown" }
+    '5': { "id": "5", "email": "michael.brown@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "Michael Brown" },
+    '6': { "id": "6", "email": "sarah.davis@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "Sarah Davis" },
+    '7': { "id": "7", "email": "david.wilson@demo.com", "password": generate_password_hash('password'), "role": "patient", "name": "David Wilson" }
 }
 
 default_patient_details = {
@@ -44,7 +45,17 @@ patients = {
         "details": {
             "age": 65, "sex": "Male", "height": 1.8, "weight": 85, "bmi": 26.2,
             "clinicalInfo": "Post-op recovery from total knee replacement. Reports mild pain and swelling."
-        }
+        },
+        "feedback": [
+            {
+                "sessionId": "weekly_1703123456789",
+                "timestamp": "2023-12-21T10:30:00.000Z",
+                "pain": 3,
+                "fatigue": 4,
+                "difficulty": 5,
+                "comments": "Feeling much better this week. Pain has decreased significantly."
+            }
+        ]
     },
     '2': { 
         "id": '2', 
@@ -55,7 +66,17 @@ patients = {
         "details": {
             "age": 42, "sex": "Female", "height": 1.65, "weight": 60, "bmi": 22.0,
             "clinicalInfo": "ACL reconstruction on the left knee. Currently non-weight bearing."
-        }
+        },
+        "feedback": [
+            {
+                "sessionId": "weekly_1703123456790",
+                "timestamp": "2023-12-20T14:15:00.000Z",
+                "pain": 6,
+                "fatigue": 7,
+                "difficulty": 8,
+                "comments": "Still experiencing some pain during exercises. Need to take more breaks."
+            }
+        ]
     },
     '3': { 
         "id": '3', 
@@ -67,7 +88,30 @@ patients = {
         }
     },
     '4': { "id": '4', "name": 'Emily Williams', "recovery_process": [], "details": default_patient_details },
-    '5': { "id": '5', "name": 'Michael Brown', "recovery_process": [], "details": default_patient_details }
+    '5': { "id": '5', "name": 'Michael Brown', "recovery_process": [], "details": default_patient_details },
+    '6': { 
+        "id": '6', 
+        "name": 'Sarah Davis', 
+        "recovery_process": [
+            { "id": "rp4", "name": "Hip Abduction", "completed": False, "targetRepetitions": 10, "targetSets": 3, "instructions": "Keep your back straight." },
+        ],
+        "details": {
+            "age": 35, "sex": "Female", "height": 1.68, "weight": 62, "bmi": 22.0,
+            "clinicalInfo": "Post-hip surgery recovery. Working on range of motion."
+        }
+    },
+    '7': { 
+        "id": '7', 
+        "name": 'David Wilson', 
+        "recovery_process": [
+            { "id": "rp5", "name": "Ankle Circles", "completed": True, "targetRepetitions": 20, "targetSets": 2, "instructions": "Move slowly in both directions." },
+            { "id": "rp6", "name": "Calf Raises", "completed": False, "targetRepetitions": 15, "targetSets": 3, "instructions": "Hold for 3 seconds at the top." },
+        ],
+        "details": {
+            "age": 45, "sex": "Male", "height": 1.82, "weight": 78, "bmi": 23.5,
+            "clinicalInfo": "Ankle sprain recovery. Focus on stability and strength."
+        }
+    }
 }
 
 doctors_patients = {
@@ -188,6 +232,11 @@ def signup():
         }
     })
 
+@app.route('/me', methods=['GET'])
+@token_required
+def get_current_user(current_user):
+    return jsonify(current_user)
+
 @app.route('/patients/<patient_id>', methods=['GET'])
 @token_required
 def get_patient(current_user, patient_id):
@@ -281,6 +330,38 @@ def update_patient_details(current_user, patient_id):
         if height > 0 and weight > 0:
             patients[patient_id]['details']['bmi'] = weight / (height * height)
 
+    return jsonify(patients[patient_id])
+
+@app.route('/patients/<patient_id>/feedback', methods=['PUT'])
+@token_required
+def update_patient_feedback(current_user, patient_id):
+    print(f"Feedback request - User: {current_user['id']}, Role: {current_user['role']}, Patient: {patient_id}")
+    
+    # Allow both patients and doctors to update feedback
+    if current_user['role'] == 'patient' and current_user['id'] != patient_id:
+        return jsonify({"error": "Patients can only update their own feedback"}), 403
+
+    if patient_id not in patients:
+        print(f"Patient {patient_id} not found in patients data")
+        return jsonify({"error": "Patient not found"}), 404
+
+    data = request.get_json()
+    print(f"Received data: {data}")
+    
+    if not data or 'feedback' not in data:
+        return jsonify({"error": "Missing feedback data"}), 400
+
+    # Initialize feedback array if it doesn't exist
+    if 'feedback' not in patients[patient_id]:
+        patients[patient_id]['feedback'] = []
+    
+    # Add new feedback to the array
+    if isinstance(data['feedback'], list):
+        patients[patient_id]['feedback'].extend(data['feedback'])
+    else:
+        patients[patient_id]['feedback'].append(data['feedback'])
+
+    print(f"Updated patient {patient_id} with feedback")
     return jsonify(patients[patient_id])
 
 if __name__ == '__main__':

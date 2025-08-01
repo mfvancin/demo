@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, FlatList } from 'react-native';
 import { useTheme } from '@theme/ThemeContext';
 import { useAuth } from '@context/AuthContext';
@@ -8,13 +8,21 @@ import { Ionicons } from '@expo/vector-icons';
 import type { RecoveryProcess } from '../types';
 import ActivityRings from '@components/ActivityRings';
 import ChartCard from '@components/ChartCard';
+import WeeklyFeedbackCard from '@components/WeeklyFeedbackCard';
 
 const PatientHomeScreen = ({ navigation }: any) => {
     const { colors } = useTheme();
     const { user } = useAuth();
-    const { patients } = usePatients();
+    const { patients, updatePatient } = usePatients();
     const { healthData, dailyData, isConnected, isLoading, connectDevice, refreshHealthData } = useHealth();
     const patient = user ? patients[user.id] : null;
+
+    // Debug logging
+    useEffect(() => {
+        console.log('Current user:', user);
+        console.log('All patients:', patients);
+        console.log('Current patient:', patient);
+    }, [user, patients, patient]);
 
     if (!patient) {
         return (
@@ -42,6 +50,30 @@ const PatientHomeScreen = ({ navigation }: any) => {
             goal: 12,
             current: Math.round((dailyData?.activeMinutes || 0) / 60) || 0,
         },
+    };
+
+    const handleWeeklyFeedbackSubmit = async (feedback: any) => {
+        try {
+            console.log('Submitting feedback for user:', user?.id);
+            console.log('Patient data:', patient);
+            
+            if (!user?.id) {
+                console.error('No user ID available');
+                return;
+            }
+
+            const newFeedback = {
+                ...feedback,
+                sessionId: `weekly_${Date.now()}`,
+                timestamp: new Date().toISOString(),
+            };
+
+            await updatePatient(user.id, {
+                feedback: [...(patient.feedback || []), newFeedback]
+            });
+        } catch (error) {
+            console.error('Failed to submit weekly feedback:', error);
+        }
     };
 
     const renderExerciseItem = ({ item }: { item: RecoveryProcess }) => (
@@ -171,9 +203,11 @@ const PatientHomeScreen = ({ navigation }: any) => {
                                 {(healthData.distance / 1000).toFixed(1)}
                             </Text>
                             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>KM</Text>
-        </View>
+                        </View>
                     </View>
                 )}
+
+                <WeeklyFeedbackCard onSubmit={handleWeeklyFeedbackSubmit} />
 
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Exercises</Text>
                 <FlatList

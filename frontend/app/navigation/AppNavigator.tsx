@@ -14,6 +14,7 @@ import SignupScreen from '@screens/SignupScreen';
 import PatientHomeScreen from '@screens/PatientHomeScreen';
 import DoctorHomeScreen from '@screens/DoctorHomeScreen';
 import PatientDetailScreen from '@screens/PatientDetailScreen';
+import ExerciseDetailScreen from '@screens/ExerciseDetailScreen';
 import ProfileScreen from '@screens/ProfileScreen';
 import MovellaScreen from '@screens/MovellaScreen';
 import CreatePatientScreen from '@screens/CreatePatientScreen';
@@ -23,6 +24,7 @@ type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
   PatientDetail: { patientId: string; role: string };
+  ExerciseDetail: { exercise: any };
   CreatePatient: undefined;
   Profile: undefined;
 };
@@ -181,6 +183,14 @@ const AppNavigator = () => {
               component={PatientDetailScreen}
               options={{
                 headerTitle: 'Patient Details',
+                headerBackTitle: 'Back',
+              }}
+            />
+            <Stack.Screen
+              name="ExerciseDetail"
+              component={ExerciseDetailScreen}
+              options={{
+                headerTitle: 'Exercise',
                 headerBackTitle: 'Back',
               }}
             />
